@@ -210,12 +210,17 @@ function startDINTest() { //start DIN test
                 document.getElementById("DINTestAudio").src = `audio/triplets/${DIN_noise[round_number - 1]}.wav`;
                 document.getElementById("DIN_Test_Round_Display").textContent = `Round ${round_number}/20`;
                 document.getElementById("DIN_User_Input").value = "";
+                test_completed = true;
+            }
+            else {
+
+                displayDINTestResults(correct_guesses, round_results);
             }
         }
         else {
             test_completed = true;
+            displayDINTestResults(correct_guesses, round_results);
         }
-
     });
 
     if (test_completed) {
