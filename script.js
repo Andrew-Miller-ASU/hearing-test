@@ -1,8 +1,158 @@
-let index = 0, results = [];
-let testMode = 'both'; // 'both', 'left', or 'right'
-let tones = [];
+// ---------- Audio Utilities (Web Audio API) ----------
 
-// dB HL Testing code
+let audioContext = null;      // Web Audio API AudioContext for entire application
+
+// Retrieve the application-wide AudioContext for playing and manipulating audio
+async function getAudioContext()
+{
+  if (audioContext && audioContext.state !== "closed")                        // Check if the AudioContext exists and is not closed
+  {
+    if (audioContext.state === "suspended") await audioContext.resume();      // Resume the AudioContext if it's suspended
+    return audioContext;                                                      // Return the existing AudioContext
+  }
+
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();    // Create a new AudioContext if one does not exist or it's closed
+  return audioContext;
+}
+
+// Given a URL (file path), creates an AudioBuffer object which stores the audio asset in memory
+// The audio can be played by passing the AudioBuffer object into a AudioBufferSourceNode object
+// The AudioBuffer is persistent and can be used to generate multiple AudioBufferSourceNodes, which can only be played once
+async function getAudioBufferFromUrl(ctx, url)
+{
+  const response = await fetch(url, { cache: "force-cache" });
+  if (!response.ok) throw new Error(`Failed to fetch: ${url}`);
+  const arrayBuffer = await response.arrayBuffer();
+  return await ctx.decodeAudioData(arrayBuffer.slice(0));
+}
+
+// Creates an AudioBufferSourceNode from an AudioBuffer object
+// The audio can be played by calling start() and stopped by calling stop()
+function getSourceNode(ctx, audioBuffer)
+{
+  const srcNode = ctx.createBufferSource();
+  srcNode.buffer = audioBuffer;
+  srcNode.connect(ctx.destination);
+  return srcNode;
+} 
+
+// Creates an AudioBufferSourceNode from an AudioBuffer object
+// Attaches the AudioBufferSourceNode to a GainNode, which can be used to adjust gain (volume)
+// gainAmount = 1   = original volume
+// gainAmount = 0   = silent
+// gainAmount = 0.5 = half volume
+// gainAmount = 2   = double volume
+function getSourceNodeWithGain(ctx, audioBuffer, gainAmount)
+{
+  const srcNode = ctx.createBufferSource();
+  srcNode.buffer = audioBuffer;
+
+  const gainNode = ctx.createGain();
+  gainNode.gain.value = gainAmount;
+
+  srcNode.connect(gainNode).connect(ctx.destination);
+  return srcNode;
+} 
+
+
+// ---------- DIN Test Code ----------
+
+const DIN_TEST_AUDIO_PATH = "/audio/triplets/";    // Audio files for every spoken 3-digit combination and background noise
+const NOISE_BUFFER_DURATION = 0.5;                 // Amount of time (in seconds) the noise will play before and after the spoken digits
+
+// Returns a random combination of 3 digits as a string
+function getRandomDigitTriplet()
+{
+  const triplet = Math.floor(Math.random() * 1000);
+  return String(triplet).padStart(3, "0");
+}
+
+let noiseAudioBuffer = null;
+let digitsAudioBuffer = null;
+
+function resetDinTestUI()
+{
+  document.getElementById("digits-input").value = "";
+  document.getElementById("din-submit-div").style.display = "block";
+  document.getElementById("din-correct-msg").style.display = "none";
+  document.getElementById("din-incorrect-msg").style.display = "none";
+  document.getElementById("din-digits-played").style.display = "none";
+  document.getElementById("din-new-test-div").style.display = "none";
+}
+
+async function startDinTest()
+{
+  document.getElementById("mode-select").style.display = "none";      // Hide the mode selection menu
+  document.getElementById("din-test-area").style.display = "block";   // Show the DIN testing interface
+
+  resetDinTestUI();
+
+  let triplet = null;
+
+  // Play button event listener
+  document.getElementById("din-play-btn").addEventListener("click", async () => {
+    if (!triplet) triplet = getRandomDigitTriplet();      // Generate a new digit triplet if one hasn't been generated already for this test
+    await playTriplet(triplet, 1.0);
+  });
+
+  // Submit button event listener
+  document.getElementById("din-submit-btn").addEventListener("click", async () => {
+    userInput = document.getElementById("digits-input").value;      // Retrieve user input
+
+    if (userInput.length < 3 || !triplet)
+    {
+      return;
+    }
+    else if (userInput == triplet)  // If user input was correct
+    {
+      document.getElementById("din-submit-div").style.display = "none";
+      document.getElementById("din-correct-msg").style.display = "block";
+      document.getElementById("din-digits-played").textContent = "Digits played: " + triplet.charAt(0) + "–" + triplet.charAt(1) + "–" + triplet.charAt(2);
+      document.getElementById("din-digits-played").style.display = "block";
+      document.getElementById("din-new-test-div").style.display = "block";
+    }
+    else                            // If user input was incorrect
+    {
+      document.getElementById("din-submit-div").style.display = "none";
+      document.getElementById("din-incorrect-msg").style.display = "block";
+      document.getElementById("din-digits-played").textContent = "Digits played: " + triplet.charAt(0) + "–" + triplet.charAt(1) + "–" + triplet.charAt(2);
+      document.getElementById("din-digits-played").style.display = "block";
+      document.getElementById("din-new-test-div").style.display = "block";
+    }
+  });
+
+  // New Test button event listener
+  document.getElementById("din-new-test-btn").addEventListener("click", async () => {
+    resetDinTestUI();
+    triplet = null;
+  });
+}
+
+// Given a digit triplet and gain amount, will play the audio for the digit triplet concurrently with the noise audio (with the specified gain adjustment)
+async function playTriplet(triplet, gainAmount)
+{
+  const ctx = await getAudioContext();
+
+  // Create the AudioBuffer for the background noise, which can be reused throughout the entire test
+  if (!noiseAudioBuffer) noiseAudioBuffer = await getAudioBufferFromUrl(ctx, `${DIN_TEST_AUDIO_PATH}din_noise.wav`);
+  let noiseSourceNode = getSourceNodeWithGain(ctx, noiseAudioBuffer, gainAmount);               // Create SourceNode to allow for noise playback
+
+  let digitsAudioBuffer = await getAudioBufferFromUrl(ctx, `${DIN_TEST_AUDIO_PATH}${triplet}.wav`);   // Create AudioBuffer for triplet audio
+  let digitsSourceNode = getSourceNode(ctx, digitsAudioBuffer);                                       // Create SourceNode to allow for digits playback
+
+  const t0 = ctx.currentTime + 0.02;                      // Current time
+
+  noiseSourceNode.start(t0);                              // Play noise first
+  digitsSourceNode.start(t0 + NOISE_BUFFER_DURATION);     // Play digits after specified buffer time has passed
+
+  const totalDuration = digitsAudioBuffer.duration + 2 * NOISE_BUFFER_DURATION;   // Calculate total noise duration including buffer time
+  noiseSourceNode.stop(t0 + totalDuration);                                       // Stop noise playback
+
+  return {triplet, gainAmount}    // Return the triplet that was played and the volume level
+}
+
+
+// ---------- dB HL Testing Code ----------
 
 // Calibration constant (RETSPL value) mapping SPL to HL for a specific piece of hearing equipment (which SPL equals 0 HL)
 // Can be roughly approximated by obtaining ISO RETSPL for similar equipment
@@ -20,8 +170,6 @@ const K_1K = CAL_SPL0_1K - CAL_RETSPL_1K;
 // Tone duration
 const DBHL_DURATION_SEC = 1.0;
 
-let audioCtx = null;
-
 function dbfsToAmp(dbfs) {
   const amp = Math.pow(10, dbfs / 20);
   return Math.max(0, Math.min(1, amp));
@@ -32,8 +180,7 @@ function ampToHL1k(A) {
 }
 
 async function playSineBuffer(freqHz, dbfs, durationSec) {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch(e) {} }
+  const audioCtx = await getAudioContext();
 
   const sr = audioCtx.sampleRate;
   const n  = Math.max(1, Math.floor(durationSec * sr));
@@ -149,7 +296,7 @@ function startDbHlTest() {
   };
 }
 
-// End of dB HL Testing code
+// ---------- Calibration Prompt Code ----------
 
 function calibrationTest() {
 
@@ -165,6 +312,13 @@ function proceedToTest() {
     document.getElementById("mode-select").style.display = "block";
 
 }
+
+
+// ---------- Original Code ----------
+
+let index = 0, results = [];
+let testMode = 'both'; // 'both', 'left', or 'right'
+let tones = [];
 
 function startTest(mode) {
   testMode = mode;
@@ -391,5 +545,4 @@ function showResults() {
     }
   });
 }
-
 
