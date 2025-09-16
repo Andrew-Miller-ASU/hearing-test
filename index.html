@@ -20,7 +20,42 @@
        <button onclick="startTest('both')">🔊 No Headphones</button>
        <button onclick="startTest('headphones')">🎧 Headphones (Left & Right)</button>
        <button onclick="startDbHlTest()">dB HL Testing</button>
-       <button onclick="startDinTest()">DIN Test</button>
+       <button onclick="startDINTest()">Digit-In-Noise Testing</button>
+    </div>
+    <div id="DIN_Test_Area" style="display: none;">
+        <h2>Digit-In-Noise Test</h2>
+        <p style="margin-bottom:12px; text-align:left;">The Digits-in-Noise Test will measure your ability to discern speech in the presence of background noise.</p>
+        <p style="margin-bottom:12px; text-align:left;">Click "Play" to listen to the audio, then enter the digits you heard and click "Submit" to check your accuracy.</p>
+        <p id="DIN_Test_Round_Display">Round 1/20</p>
+        <div style="display:flex; justify-content:center; margin-top:20px; margin-bottom:20px;">
+            <button id="din-play-button">Play</button>
+        </div>
+        <input id="DIN_User_Input" type="text"
+            inputmode="numeric"
+            pattern="[0-9]{3}"
+            maxlength="3"
+            style="
+            font-size:64px;
+            font-family:monospace;
+            text-align:center;
+            border:3px solid #cbd5e1;
+            border-radius:10px;
+            padding:8px;
+            padding-left:calc(8px + 1ch);
+            width:6ch;
+            letter-spacing:1ch;
+            "
+        />
+        <div style="display:flex; justify-content:center; margin-top:20px; margin-bottom:20px;">
+            <button id="DIN_Test_enter_button">Submit</button>
+            <button id="quit_DIN_Test_Button">Quit</button>
+        </div>
+        <br />
+        <audio id="DINTestAudio" style="display: none;" controls></audio>
+    </div>
+    <div id="DIN_Results_Area" style="display: none;">
+        <h2>Digit-In-Noise Results</h2>
+        <pre id="DIN_Results_Text_Display" style="margin-bottom:12px;"></pre>
     </div>
     <div id="test-area" style="display: none;">
       <p><em>Click "Play", then tell us if you can hear the sound. This helps check your hearing sensitivity at different tones.</em></p>
@@ -54,40 +89,6 @@
       </div>
       <p id="dbhl-result" style="font-weight:600; margin-top:10px;"></p>
       <pre id="dbhl-log" style="background:#f8f9fa; padding:10px; border-radius:8px; max-height:200px; overflow:auto; margin-top:8px;"></pre>
-    </div>
-
-    <div id="din-test-area" style="display:none;">
-      <p style="margin-bottom:12px; text-align:left;">The Digits-in-Noise Test will measure your ability to discern speech in the presence of background noise.</p>
-      <p style="margin-bottom:12px; text-align:left;">Click "Play" to listen to the audio, then enter the digits you heard and click "Submit" to check your accuracy.</p>
-      <div style="display:flex; justify-content:center; margin-top:20px; margin-bottom:20px;">
-        <button id="din-play-btn">Play</button>
-      </div>
-      <input
-        id="digits-input"
-        type="text"
-        inputmode="numeric"
-        pattern="[0-9]{3}"
-        maxlength="3"
-        style="
-          font-size:64px;
-          font-family:monospace;
-          text-align:center;
-          border:3px solid #cbd5e1;
-          border-radius:10px;
-          padding:8px;
-          padding-left:calc(8px + 1ch);
-          width:6ch;
-          letter-spacing:1ch;
-      ">
-      <div id="din-submit-div" style="display:flex; justify-content:center; gap:24px; margin-top:20px;">
-        <button id="din-submit-btn">Submit</button>
-      </div>
-      <p id="din-correct-msg"   style="display:none; font-weight:700; color:#16a34a; text-align:center; margin-top:12px;">Correct!</p>
-      <p id="din-incorrect-msg" style="display:none; font-weight:700; color:#dc2626; text-align:center; margin-top:12px;">Incorrect!</p>
-      <p id="din-digits-played" style="display:none; font-weight:700; color:#111; text-align:center; margin-top:8px;">Digits played: </p>
-      <div id="din-new-test-div" style="display:none; justify-content:center; margin-top:20px;">
-        <button id="din-new-test-btn">New Test</button>
-      </div>
     </div>
 
     <!-- Results will appear here -->
