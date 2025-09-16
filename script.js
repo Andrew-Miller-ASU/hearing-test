@@ -1,158 +1,8 @@
-// ---------- Audio Utilities (Web Audio API) ----------
+let index = 0, results = [];
+let testMode = 'both'; // 'both', 'left', or 'right'
+let tones = [];
 
-let audioContext = null;      // Web Audio API AudioContext for entire application
-
-// Retrieve the application-wide AudioContext for playing and manipulating audio
-async function getAudioContext()
-{
-  if (audioContext && audioContext.state !== "closed")                        // Check if the AudioContext exists and is not closed
-  {
-    if (audioContext.state === "suspended") await audioContext.resume();      // Resume the AudioContext if it's suspended
-    return audioContext;                                                      // Return the existing AudioContext
-  }
-
-  audioContext = new (window.AudioContext || window.webkitAudioContext)();    // Create a new AudioContext if one does not exist or it's closed
-  return audioContext;
-}
-
-// Given a URL (file path), creates an AudioBuffer object which stores the audio asset in memory
-// The audio can be played by passing the AudioBuffer object into a AudioBufferSourceNode object
-// The AudioBuffer is persistent and can be used to generate multiple AudioBufferSourceNodes, which can only be played once
-async function getAudioBufferFromUrl(ctx, url)
-{
-  const response = await fetch(url, { cache: "force-cache" });
-  if (!response.ok) throw new Error(`Failed to fetch: ${url}`);
-  const arrayBuffer = await response.arrayBuffer();
-  return await ctx.decodeAudioData(arrayBuffer.slice(0));
-}
-
-// Creates an AudioBufferSourceNode from an AudioBuffer object
-// The audio can be played by calling start() and stopped by calling stop()
-function getSourceNode(ctx, audioBuffer)
-{
-  const srcNode = ctx.createBufferSource();
-  srcNode.buffer = audioBuffer;
-  srcNode.connect(ctx.destination);
-  return srcNode;
-} 
-
-// Creates an AudioBufferSourceNode from an AudioBuffer object
-// Attaches the AudioBufferSourceNode to a GainNode, which can be used to adjust gain (volume)
-// gainAmount = 1   = original volume
-// gainAmount = 0   = silent
-// gainAmount = 0.5 = half volume
-// gainAmount = 2   = double volume
-function getSourceNodeWithGain(ctx, audioBuffer, gainAmount)
-{
-  const srcNode = ctx.createBufferSource();
-  srcNode.buffer = audioBuffer;
-
-  const gainNode = ctx.createGain();
-  gainNode.gain.value = gainAmount;
-
-  srcNode.connect(gainNode).connect(ctx.destination);
-  return srcNode;
-} 
-
-
-// ---------- DIN Test Code ----------
-
-const DIN_TEST_AUDIO_PATH = "/audio/triplets/";    // Audio files for every spoken 3-digit combination and background noise
-const NOISE_BUFFER_DURATION = 0.5;                 // Amount of time (in seconds) the noise will play before and after the spoken digits
-
-// Returns a random combination of 3 digits as a string
-function getRandomDigitTriplet()
-{
-  const triplet = Math.floor(Math.random() * 1000);
-  return String(triplet).padStart(3, "0");
-}
-
-let noiseAudioBuffer = null;
-let digitsAudioBuffer = null;
-
-function resetDinTestUI()
-{
-  document.getElementById("digits-input").value = "";
-  document.getElementById("din-submit-div").style.display = "block";
-  document.getElementById("din-correct-msg").style.display = "none";
-  document.getElementById("din-incorrect-msg").style.display = "none";
-  document.getElementById("din-digits-played").style.display = "none";
-  document.getElementById("din-new-test-div").style.display = "none";
-}
-
-async function startDinTest()
-{
-  document.getElementById("mode-select").style.display = "none";      // Hide the mode selection menu
-  document.getElementById("din-test-area").style.display = "block";   // Show the DIN testing interface
-
-  resetDinTestUI();
-
-  let triplet = null;
-
-  // Play button event listener
-  document.getElementById("din-play-btn").addEventListener("click", async () => {
-    if (!triplet) triplet = getRandomDigitTriplet();      // Generate a new digit triplet if one hasn't been generated already for this test
-    await playTriplet(triplet, 1.0);
-  });
-
-  // Submit button event listener
-  document.getElementById("din-submit-btn").addEventListener("click", async () => {
-    userInput = document.getElementById("digits-input").value;      // Retrieve user input
-
-    if (userInput.length < 3 || !triplet)
-    {
-      return;
-    }
-    else if (userInput == triplet)  // If user input was correct
-    {
-      document.getElementById("din-submit-div").style.display = "none";
-      document.getElementById("din-correct-msg").style.display = "block";
-      document.getElementById("din-digits-played").textContent = "Digits played: " + triplet.charAt(0) + "–" + triplet.charAt(1) + "–" + triplet.charAt(2);
-      document.getElementById("din-digits-played").style.display = "block";
-      document.getElementById("din-new-test-div").style.display = "block";
-    }
-    else                            // If user input was incorrect
-    {
-      document.getElementById("din-submit-div").style.display = "none";
-      document.getElementById("din-incorrect-msg").style.display = "block";
-      document.getElementById("din-digits-played").textContent = "Digits played: " + triplet.charAt(0) + "–" + triplet.charAt(1) + "–" + triplet.charAt(2);
-      document.getElementById("din-digits-played").style.display = "block";
-      document.getElementById("din-new-test-div").style.display = "block";
-    }
-  });
-
-  // New Test button event listener
-  document.getElementById("din-new-test-btn").addEventListener("click", async () => {
-    resetDinTestUI();
-    triplet = null;
-  });
-}
-
-// Given a digit triplet and gain amount, will play the audio for the digit triplet concurrently with the noise audio (with the specified gain adjustment)
-async function playTriplet(triplet, gainAmount)
-{
-  const ctx = await getAudioContext();
-
-  // Create the AudioBuffer for the background noise, which can be reused throughout the entire test
-  if (!noiseAudioBuffer) noiseAudioBuffer = await getAudioBufferFromUrl(ctx, `${DIN_TEST_AUDIO_PATH}din_noise.wav`);
-  let noiseSourceNode = getSourceNodeWithGain(ctx, noiseAudioBuffer, gainAmount);               // Create SourceNode to allow for noise playback
-
-  let digitsAudioBuffer = await getAudioBufferFromUrl(ctx, `${DIN_TEST_AUDIO_PATH}${triplet}.wav`);   // Create AudioBuffer for triplet audio
-  let digitsSourceNode = getSourceNode(ctx, digitsAudioBuffer);                                       // Create SourceNode to allow for digits playback
-
-  const t0 = ctx.currentTime + 0.02;                      // Current time
-
-  noiseSourceNode.start(t0);                              // Play noise first
-  digitsSourceNode.start(t0 + NOISE_BUFFER_DURATION);     // Play digits after specified buffer time has passed
-
-  const totalDuration = digitsAudioBuffer.duration + 2 * NOISE_BUFFER_DURATION;   // Calculate total noise duration including buffer time
-  noiseSourceNode.stop(t0 + totalDuration);                                       // Stop noise playback
-
-  return {triplet, gainAmount}    // Return the triplet that was played and the volume level
-}
-
-
-// ---------- dB HL Testing Code ----------
+// dB HL Testing code
 
 // Calibration constant (RETSPL value) mapping SPL to HL for a specific piece of hearing equipment (which SPL equals 0 HL)
 // Can be roughly approximated by obtaining ISO RETSPL for similar equipment
@@ -170,6 +20,8 @@ const K_1K = CAL_SPL0_1K - CAL_RETSPL_1K;
 // Tone duration
 const DBHL_DURATION_SEC = 1.0;
 
+let audioCtx = null;
+
 function dbfsToAmp(dbfs) {
   const amp = Math.pow(10, dbfs / 20);
   return Math.max(0, Math.min(1, amp));
@@ -180,7 +32,8 @@ function ampToHL1k(A) {
 }
 
 async function playSineBuffer(freqHz, dbfs, durationSec) {
-  const audioCtx = await getAudioContext();
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch(e) {} }
 
   const sr = audioCtx.sampleRate;
   const n  = Math.max(1, Math.floor(durationSec * sr));
@@ -296,9 +149,9 @@ function startDbHlTest() {
   };
 }
 
-// ---------- Calibration Prompt Code ----------
+// End of dB HL Testing code
 
-function calibrationTest() {
+function calibrationTest() { //display sound element for user to test their audios
 
     document.getElementById("calibrationTestAudio").src = `audio/250Hz_40dB.wav`;
     document.getElementById("calibrationTestAudio").style.display = "block";
@@ -313,12 +166,128 @@ function proceedToTest() {
 
 }
 
+function startDINTest() { //start DIN test
 
-// ---------- Original Code ----------
+    document.getElementById("mode-select").style.display = "none";
+    document.getElementById("DIN_Test_Area").style.display = "block";
+    user_quit = false;
+    round_number = 1;
+    test_completed = false;
+    DIN_noise = generateDINNoise();
+    correct_guesses = [];
+    round_results = [];
+    correct_answer = 0;
+    document.getElementById("DINTestAudio").src = `audio/triplets/${DIN_noise[0]}.wav`;
+    document.getElementById("quit_DIN_Test_Button").addEventListener('click', function () {
 
-let index = 0, results = [];
-let testMode = 'both'; // 'both', 'left', or 'right'
-let tones = [];
+        user_quit = true;
+        displayDINTestResults(correct_guesses, round_results);
+
+    });
+
+    document.getElementById("din-play-button").addEventListener('click', function () {
+
+        document.getElementById("DINTestAudio").play();
+
+    });
+
+    document.getElementById("DIN_Test_enter_button").addEventListener('click', function () {
+
+        if (round_number < 21 && !user_quit) {
+            
+            correct_answer = DIN_noise[round_number - 1];
+            input_text = document.getElementById("DIN_User_Input").value;
+            
+            if (String(input_text) == correct_answer) {
+
+                correct_guesses.push(round_number);
+                
+            }
+            round_results.push(`Round ${round_number}/20: \t Correct Answer: ${correct_answer} \t Your Answer: ${String(input_text)}`);
+            
+            round_number++;
+            if (round_number < 21) {
+                document.getElementById("DINTestAudio").src = `audio/triplets/${DIN_noise[round_number - 1]}.wav`;
+                document.getElementById("DIN_Test_Round_Display").textContent = `Round ${round_number}/20`;
+                document.getElementById("DIN_User_Input").value = "";
+            }
+        }
+        else {
+            test_completed = true;
+        }
+
+    });
+
+    if (test_completed) {
+
+        displayDINTestResults(correct_guesses, round_results);
+    }
+}
+
+function displayDINTestResults(correct, results) { //display DIN results
+
+
+    
+
+    document.getElementById("DIN_Test_Area").style.display = "none";
+    document.getElementById("DIN_Results_Area").style.display = "block";
+
+    content = `You were correct ${correct.length} times!\n\n`;
+
+    
+
+    for (i = 0; i < results.length; i++) {
+
+        content += results[i] + "\n";
+        
+    }
+    document.getElementById("DIN_Results_Text_Display").textContent = content;
+
+}
+
+function generateDINNoise() {
+
+    noise = [];
+    
+    for (i = 0; i < 20; i++) { //create an array of 20 integers
+
+        number = Math.floor(Math.random() * 1000); //create a random integer from 0 to 999
+        threeDigitNumber = String(number).padStart(3, '0'); //format that integer to 3 digits
+        
+        noise.push(String(threeDigitNumber));
+
+        /*while (true) {
+            number = Math.floor(Math.random() * 1000); //create a random integer from 0 to 999
+            threeDigitNumber = String(number).padStart(3, '0'); //format that integer to 3 digits
+            filePath = `audio/triplets/${threeDigitNumber}.wav`; //ensure the file exists in audio/triplets. Make sure you've ran the generate_audio.py file.
+            if (doesFileExist(filePath)) {
+                console.log('File exists.');
+                noise.push(threeDigitNumber);
+                break;
+            } else {
+                console.log('File does not exist.');
+                continue;
+            }
+        }*/
+    }
+
+    return noise;
+}
+
+function doesFileExist(urlToFile) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('HEAD', urlToFile, false); // 'false' makes the request synchronous
+    xhr.send();
+
+    if (xhr.status === 200) { // HTTP status 200 indicates success (file exists)
+        return true;
+    } else if (xhr.status === 404) { // HTTP status 404 indicates file not found
+        return false;
+    } else {
+        // Handle other potential status codes if needed (e.g., 403 Forbidden)
+        return false;
+    }
+}
 
 function startTest(mode) {
   testMode = mode;
@@ -545,4 +514,5 @@ function showResults() {
     }
   });
 }
+
 
