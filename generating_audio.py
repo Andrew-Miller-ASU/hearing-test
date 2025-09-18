@@ -1,70 +1,68 @@
+"""
+Source digits are at: audio/triplets/digits/0.wav ... 9.wav
+Output triplets go to: audio/triplets/<abc>.wav
+We do NOT modify or delete the digit files.
+
+"""
+
 import os
-from itertools import product
-import pyttsx3
+import random
 from pydub import AudioSegment
 
-AUDIO_FOLDER  = "audio"
+AUDIO_FOLDER = "audio"
 OUTPUT_FOLDER = os.path.join(AUDIO_FOLDER, "triplets")
-DIGIT_CACHE   = os.path.join(AUDIO_FOLDER, "digits_cache")  # stores 0.wav..9.wav
-GAP_MS        = 300  # silence between digits
+DIGITS_FOLDER = os.path.join(OUTPUT_FOLDER, "digits")  # fixed location 
 
-def ensure_dirs():
-    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-    os.makedirs(DIGIT_CACHE, exist_ok=True)
+GAP_MS = 300
+NUM_TRIPLETS = 240
 
-def build_digit_cache():
-    """
-    Synthesize digits 0..9 exactly once (if missing).
-    """
-    engine = pyttsx3.init()
-    # Optional tuning:
-    # engine.setProperty("rate", 175)
-    # engine.setProperty("volume", 1.0)
 
-    # Queue only the missing digits, then run once
-    queued = False
+def load_digits():
+    """Load 0.wav..9.wav from DIGITS_FOLDER once."""
+
+    digits = {}
     for d in range(10):
-        path = os.path.join(DIGIT_CACHE, f"{d}.wav")
+        path = os.path.join(DIGITS_FOLDER, f"{d}.wav")
         if not os.path.exists(path):
-            engine.save_to_file(str(d), path)
-            queued = True
-    if queued:
-        engine.runAndWait()
-
-def load_digit_audio():
-    """
-    Load cached 0..9 into memory as AudioSegments.
-    """
-    digits = []
-    for d in range(10):
-        path = os.path.join(DIGIT_CACHE, f"{d}.wav")
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"Missing cached digit: {path}. Run build_digit_cache() first.")
-        digits.append(AudioSegment.from_wav(path))
+            raise FileNotFoundError(f"Missing digit file: {path}")
+        digits[str(d)] = AudioSegment.from_wav(path)
     return digits
 
-def export_triplet(triplet_str, digits_audio):
-    """
-    Assemble TRIPLET from cached digits and export as audio/triplets/XYZ.wav
-    """
-    d0, d1, d2 = (int(triplet_str[0]), int(triplet_str[1]), int(triplet_str[2]))
-    gap = AudioSegment.silent(duration=GAP_MS)
-    audio = digits_audio[d0] + gap + digits_audio[d1] + gap + digits_audio[d2]
 
-    out_path = os.path.join(OUTPUT_FOLDER, f"{triplet_str}.wav")
-    audio.export(out_path, format="wav")
-    return out_path
+def generate_triplet_audio(triplet: str, digits_map: dict, output_path: str):
+    """Concatenate d1 + 300ms + d2 + 300ms + d3 and export to output_path."""
+    gap = AudioSegment.silent(duration=GAP_MS)
+    audio = digits_map[triplet[0]] + gap + digits_map[triplet[1]] + gap + digits_map[triplet[2]]
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    audio.export(output_path, format="wav")
+
 
 def main():
-    ensure_dirs()
-    build_digit_cache()
-    digits_audio = load_digit_audio()
+    digits_map = load_digits()
+    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-    # Deterministically generate 000..999
-    for d0, d1, d2 in product("0123456789", repeat=3):
-        triplet = f"{d0}{d1}{d2}"
-        out = export_triplet(triplet, digits_audio)
-        print(f"Generated {out}")
+    generated_this_run = set()
+    created = 0
+
+    while created < NUM_TRIPLETS:
+        triplet = "".join(str(random.randint(0, 9)) for _ in range(3))
+        if triplet in generated_this_run:
+            continue
+
+        out_path = os.path.join(OUTPUT_FOLDER, f"{triplet}.wav")
+
+        # If a file with this triplet already exists from a previous run, skip it.
+        if os.path.exists(out_path):
+            generated_this_run.add(triplet)
+            continue
+
+        generate_triplet_audio(triplet, digits_map, out_path)
+        print(f"Generated {out_path}")
+        generated_this_run.add(triplet)
+        created += 1
+
+    print(f"Done. Created {created} new triplets in '{OUTPUT_FOLDER}'.")
+
 
 if __name__ == "__main__":
     main()
