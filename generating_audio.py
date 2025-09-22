@@ -8,6 +8,7 @@ We do NOT modify or delete the digit files.
 import os
 import random
 from pydub import AudioSegment
+import itertools
 
 AUDIO_FOLDER = "audio"
 OUTPUT_FOLDER = os.path.join(AUDIO_FOLDER, "triplets")
@@ -41,14 +42,13 @@ def main():
     digits_map = load_digits()
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
+    all_triplets = (''.join(t) for t in itertools.product('0123456789', repeat=3))      # All triplets 000 through 999
+
     generated_this_run = set()
     created = 0
 
-    while created < NUM_TRIPLETS:
-        triplet = "".join(str(random.randint(0, 9)) for _ in range(3))
-        if triplet in generated_this_run:
-            continue
-
+    # Iterate through all triplets
+    for triplet in all_triplets:
         out_path = os.path.join(OUTPUT_FOLDER, f"{triplet}.wav")
 
         # If a file with this triplet already exists from a previous run, skip it.
