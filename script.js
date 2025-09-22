@@ -57,8 +57,9 @@ function getSourceNodeWithGain(ctx, audioBuffer, gainAmount)
 
 // ---------- DIN Test Code ----------
 
-const DIN_TEST_AUDIO_PATH = "/audio/triplets/";    // Audio files for every spoken 3-digit combination and background noise
+const DIN_TEST_AUDIO_PATH = "audio/triplets/";    // Audio files for every spoken 3-digit combination and background noise
 const NOISE_BUFFER_DURATION = 0.5;                 // Amount of time (in seconds) the noise will play before and after the spoken digits
+const TOTAL_TEST_ROUNDS = 15;                      // The total number of rounds until the test automatically ends
 
 // Returns a random combination of 3 digits as a string
 function getRandomDigitTriplet()
@@ -70,14 +71,39 @@ function getRandomDigitTriplet()
 let noiseAudioBuffer = null;
 let digitsAudioBuffer = null;
 
-function resetDinTestUI()
+let currentRound = 1; 
+
+// Stores data for each round of the test
+let dinTestData = [];  // Contains items: { roundNumber, digitsPlayed, digitsHeard, result }
+
+// Given a number representing the current round of the test, this function will return the gain amount that should be used in that round
+function getGainForRound(roundNumber)
 {
+  let baseGainAmount = 0.25;           // Initial noise gain (i.e., the volume of the noise in round 1)
+  let gainIncrementPerRound = 0.25;    // The amount by which the gain will be incremented for each successive round
+
+  return baseGainAmount + ((roundNumber - 1) * gainIncrementPerRound);    // Formula for calculating the gain amount for the specified round
+}
+
+function storeRoundData(digitsPlayed, digitsHeard)
+{
+  dinTestData.push({
+    roundNumber: currentRound,
+    digitsPlayed,
+    digitsHeard,
+    result: digitsPlayed === digitsHeard
+  });
+}
+
+function resetDinTest()
+{
+  currentRound = 1;
+  document.getElementById("din-round-display").textContent = "Round 1/" + TOTAL_TEST_ROUNDS;
   document.getElementById("digits-input").value = "";
-  document.getElementById("din-submit-div").style.display = "block";
-  document.getElementById("din-correct-msg").style.display = "none";
-  document.getElementById("din-incorrect-msg").style.display = "none";
-  document.getElementById("din-digits-played").style.display = "none";
-  document.getElementById("din-new-test-div").style.display = "none";
+  dinTestData = [];
+  
+  document.getElementById("din-test-controls").style.display = "block";
+  document.getElementById("din-results-section").style.display = "none";
 }
 
 async function startDinTest()
@@ -85,47 +111,91 @@ async function startDinTest()
   document.getElementById("mode-select").style.display = "none";      // Hide the mode selection menu
   document.getElementById("din-test-area").style.display = "block";   // Show the DIN testing interface
 
-  resetDinTestUI();
+  resetDinTest();
 
   let triplet = null;
 
   // Play button event listener
   document.getElementById("din-play-btn").addEventListener("click", async () => {
-    if (!triplet) triplet = getRandomDigitTriplet();      // Generate a new digit triplet if one hasn't been generated already for this test
-    await playTriplet(triplet, 1.0);
+    if (!triplet) triplet = getRandomDigitTriplet();              // Generate a new digit triplet if one hasn't been generated already for this test
+    await playTriplet(triplet, getGainForRound(currentRound));    // Play the triplet with the appropriate noise level for the current round
+  });
+
+  // Quit button event listener
+  document.getElementById("din-quit-btn").addEventListener("click", async () => {
+    endDinTest();
   });
 
   // Submit button event listener
   document.getElementById("din-submit-btn").addEventListener("click", async () => {
     userInput = document.getElementById("digits-input").value;      // Retrieve user input
 
-    if (userInput.length < 3 || !triplet)
+    if (userInput.length < 3 || !triplet)   // If the user entered less than 3 digits, or did not click Play yet, then the Submit button will do nothing
     {
       return;
     }
-    else if (userInput == triplet)  // If user input was correct
+    else
     {
-      document.getElementById("din-submit-div").style.display = "none";
-      document.getElementById("din-correct-msg").style.display = "block";
-      document.getElementById("din-digits-played").textContent = "Digits played: " + triplet.charAt(0) + "–" + triplet.charAt(1) + "–" + triplet.charAt(2);
-      document.getElementById("din-digits-played").style.display = "block";
-      document.getElementById("din-new-test-div").style.display = "block";
-    }
-    else                            // If user input was incorrect
-    {
-      document.getElementById("din-submit-div").style.display = "none";
-      document.getElementById("din-incorrect-msg").style.display = "block";
-      document.getElementById("din-digits-played").textContent = "Digits played: " + triplet.charAt(0) + "–" + triplet.charAt(1) + "–" + triplet.charAt(2);
-      document.getElementById("din-digits-played").style.display = "block";
-      document.getElementById("din-new-test-div").style.display = "block";
+      storeRoundData(triplet, userInput);   // Store data for the current round, to be shown at the end of the test
+      triplet = null;
+      if (currentRound === TOTAL_TEST_ROUNDS)
+      {
+        endDinTest();     // End the test if the user has reached the final round
+      }
+      else
+      {
+        document.getElementById("digits-input").value = "";
+        ++currentRound;
+        document.getElementById("din-round-display").textContent = `Round ${currentRound}/${TOTAL_TEST_ROUNDS}`;
+      }
     }
   });
+}
 
-  // New Test button event listener
-  document.getElementById("din-new-test-btn").addEventListener("click", async () => {
-    resetDinTestUI();
-    triplet = null;
-  });
+function endDinTest()
+{
+  // Render the results table
+
+  const tbody = document.getElementById("din-results-tbody");
+  const section = document.getElementById("din-results-section");
+  if (!tbody || !section) return;
+
+  // Clear the table
+  tbody.innerHTML = "";
+
+  // Add a row to the table for each test round
+  for (const row of dinTestData)
+  {
+    const tr = document.createElement("tr");
+
+    const tdRound = document.createElement("td");
+    tdRound.textContent = row.roundNumber;
+    tdRound.style.padding = "8px";
+    tdRound.style.borderBottom = "1px solid #f1f5f9";
+
+    const tdDigitsPlayed = document.createElement("td");
+    tdDigitsPlayed.textContent = `${row.digitsPlayed[0]}–${row.digitsPlayed[1]}–${row.digitsPlayed[2]}`;
+    tdDigitsPlayed.style.padding = "8px";
+    tdDigitsPlayed.style.borderBottom = "1px solid #f1f5f9";
+
+    const tdDigitsHeard = document.createElement("td");
+    tdDigitsHeard.textContent = `${row.digitsHeard[0]}–${row.digitsHeard[1]}–${row.digitsHeard[2]}`;
+    tdDigitsHeard.style.padding = "8px";
+    tdDigitsHeard.style.borderBottom = "1px solid #f1f5f9";
+
+    const tdResult = document.createElement("td");
+    tdResult.textContent = row.result ? "Correct" : "Incorrect";
+    tdResult.style.padding = "8px";
+    tdResult.style.borderBottom = "1px solid #f1f5f9";
+    tdResult.style.fontWeight = "700";
+    tdResult.style.color = row.result ? "#16a34a" : "#dc2626";
+
+    tr.append(tdRound, tdDigitsPlayed, tdDigitsHeard, tdResult);
+    tbody.appendChild(tr);
+  }
+
+  document.getElementById("din-test-controls").style.display = "none";      // Hide the controls for an active test
+  document.getElementById("din-results-section").style.display = "block";   // Show the end-of-test results table
 }
 
 // Given a digit triplet and gain amount, will play the audio for the digit triplet concurrently with the noise audio (with the specified gain adjustment)

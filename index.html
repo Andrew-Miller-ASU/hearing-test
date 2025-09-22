@@ -59,35 +59,49 @@
     <div id="din-test-area" style="display:none;">
       <p style="margin-bottom:12px; text-align:left;">The Digits-in-Noise Test will measure your ability to discern speech in the presence of background noise.</p>
       <p style="margin-bottom:12px; text-align:left;">Click "Play" to listen to the audio, then enter the digits you heard and click "Submit" to check your accuracy.</p>
-      <div style="display:flex; justify-content:center; margin-top:20px; margin-bottom:20px;">
-        <button id="din-play-btn">Play</button>
+
+      <div id="din-test-controls">
+        <p id="din-round-display" style="margin-top:24px; margin-bottom:12px; text-align:center; font-weight:bold;"></p>
+        <div style="justify-content:center; margin-top:20px; margin-bottom:20px;">
+          <button id="din-play-btn">Play</button>
+        </div>
+        <input
+          id="digits-input"
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]{3}"
+          maxlength="3"
+          style="
+            font-size:64px;
+            font-family:monospace;
+            text-align:center;
+            border:3px solid #cbd5e1;
+            border-radius:10px;
+            padding:8px;
+            padding-left:calc(8px + 1ch);
+            width:6ch;
+            letter-spacing:1ch;
+        ">
+        <div id="din-submit-quit-div" style="justify-content:center; gap:24px; margin-top:20px;">
+          <button id="din-submit-btn">Submit</button>
+          <button id="din-quit-btn">Quit</button>
+        </div>
       </div>
-      <input
-        id="digits-input"
-        type="text"
-        inputmode="numeric"
-        pattern="[0-9]{3}"
-        maxlength="3"
-        style="
-          font-size:64px;
-          font-family:monospace;
-          text-align:center;
-          border:3px solid #cbd5e1;
-          border-radius:10px;
-          padding:8px;
-          padding-left:calc(8px + 1ch);
-          width:6ch;
-          letter-spacing:1ch;
-      ">
-      <div id="din-submit-div" style="display:flex; justify-content:center; gap:24px; margin-top:20px;">
-        <button id="din-submit-btn">Submit</button>
-      </div>
-      <p id="din-correct-msg"   style="display:none; font-weight:700; color:#16a34a; text-align:center; margin-top:12px;">Correct!</p>
-      <p id="din-incorrect-msg" style="display:none; font-weight:700; color:#dc2626; text-align:center; margin-top:12px;">Incorrect!</p>
-      <p id="din-digits-played" style="display:none; font-weight:700; color:#111; text-align:center; margin-top:8px;">Digits played: </p>
-      <div id="din-new-test-div" style="display:none; justify-content:center; margin-top:20px;">
-        <button id="din-new-test-btn">New Test</button>
-      </div>
+
+      <section id="din-results-section" style="display:none; margin-top:24px;">
+        <h3 style="margin-bottom:8px;">Digits-in-Noise Results</h3>
+        <table id="din-results-table" style="width:100%; border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th style="text-align:center; border-bottom:2px solid #e5e7eb; padding:8px;">Round #</th>
+              <th style="text-align:center; border-bottom:2px solid #e5e7eb; padding:8px;">Digits played</th>
+              <th style="text-align:center; border-bottom:2px solid #e5e7eb; padding:8px;">Digits heard</th>
+              <th style="text-align:center; border-bottom:2px solid #e5e7eb; padding:8px;">Result</th>
+            </tr>
+          </thead>
+          <tbody id="din-results-tbody"></tbody>
+        </table>
+      </section>
     </div>
 
     <!-- Results will appear here -->
