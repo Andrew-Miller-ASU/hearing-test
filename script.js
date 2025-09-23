@@ -194,8 +194,18 @@ function endDinTest()
     tbody.appendChild(tr);
   }
 
-  document.getElementById("din-test-controls").style.display = "none";      // Hide the controls for an active test
-  document.getElementById("din-results-section").style.display = "block";   // Show the end-of-test results table
+  // Calculate the percentage of rounds the user got correct
+
+  let correctResultCount = 0;
+  for (const item of dinTestData)
+  {
+    if (item.result) correctResultCount++;
+  }
+  let correctPercentage = (100 * (correctResultCount / dinTestData.length)).toFixed(2) + "%";
+
+  document.getElementById("din-test-controls").style.display = "none";                                            // Hide the controls for an active test
+  document.getElementById("din-correct-percent-display").textContent = "Correct rounds: " + correctPercentage;    // Display the percentage of correct rounds
+  document.getElementById("din-results-section").style.display = "block";                                         // Show the end-of-test results table
 }
 
 // Given a digit triplet and gain amount, will play the audio for the digit triplet concurrently with the noise audio (with the specified gain adjustment)
