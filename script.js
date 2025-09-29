@@ -54,6 +54,112 @@ function getSourceNodeWithGain(ctx, audioBuffer, gainAmount)
   return srcNode;
 } 
 
+/***********************
+ * Highest-Only Frequency Test (frontend-only)
+ * - Adds a mode from the existing mode-select
+ * - UI has one slider, Play/Stop (placeholders), and a single "Mark Highest Audible" button
+ * - Results screen replaces the test UI after marking
+ ***********************/
+
+(function () {
+  // --- Local state
+  let freqCurrentHz = 1000;
+  let freqHighestHz = null;
+  let freqPlaying = false;
+
+  function $(id) { return document.getElementById(id); }
+  function safeHide(id) { const el = $(id); if (el) el.style.display = "none"; }
+  function safeShow(id, disp = "block") { const el = $(id); if (el) el.style.display = disp; }
+
+  function freqFmtHz(hz) {
+    const n = Number(hz) || 0;
+    if (n >= 1000) return (n / 1000).toFixed(2).replace(/\.00$/, "") + " kHz";
+    return Math.round(n).toLocaleString() + " Hz";
+  }
+
+  function setFreqStatus(text) {
+    const el = $("freq-status");
+    if (el) el.textContent = text;
+  }
+
+  // --- Public entry from the new button in mode-select
+  window.startFreqTest = function startFreqTest() {
+    // Hide other test areas to avoid overlap
+    safeHide("mode-select");
+    safeHide("test-area");
+    safeHide("dbhl-test-area");
+    safeHide("din-test-area");
+    safeHide("summary-section");
+    safeHide("results-detail");
+    safeHide("freq-results-area");
+
+    // Reset local state
+    freqCurrentHz = 1000;
+    freqHighestHz = null;
+    freqPlaying = false;
+
+    // Reset UI
+    if ($("freq-slider")) $("freq-slider").value = "1000";
+    if ($("freq-readout")) $("freq-readout").textContent = "1,000 Hz";
+    setFreqStatus("Ready");
+
+    // Show our area
+    safeShow("freq-test-area");
+  };
+
+  // --- UI handlers (wired via inline onclick/oninput in HTML)
+  window.updateFreqReadout = function updateFreqReadout() {
+    const v = Number(($("freq-slider") || {}).value || 1000);
+    freqCurrentHz = Math.round(v);
+    if ($("freq-readout")) $("freq-readout").textContent = freqFmtHz(freqCurrentHz);
+
+    // If you later implement live audio, you could update the tone frequency here.
+    if (freqPlaying) {
+      // BACKEND HOOK: update current playing tone frequency here
+    }
+  };
+
+  window.freqPlayPlaceholder = function freqPlayPlaceholder() {
+    // BACKEND HOOK: Start real audio here (Web Audio or backend call)
+    freqPlaying = true;
+    setFreqStatus(`Playing ${freqFmtHz(freqCurrentHz)} (placeholder)`);
+  };
+
+  window.freqStopPlaceholder = function freqStopPlaceholder() {
+    // BACKEND HOOK: Stop real audio here
+    freqPlaying = false;
+    setFreqStatus("Stopped (placeholder)");
+  };
+
+  window.markHighestFrequency = function markHighestFrequency() {
+    freqHighestHz = freqCurrentHz;
+
+    // Stop placeholder "audio" and show results
+    window.freqStopPlaceholder();
+
+    if ($("freq-result-text")) {
+      $("freq-result-text").innerHTML =
+        `Highest audible frequency on this setup: <strong>${freqFmtHz(freqHighestHz)}</strong>.`;
+    }
+
+    // Replace the testing UI with the results area
+    safeHide("freq-test-area");
+    safeShow("freq-results-area");
+  };
+
+  window.restartFreqTest = function restartFreqTest() {
+    // Just bounce back into start state
+    window.startFreqTest();
+  };
+
+  window.backToModesFromFreq = function backToModesFromFreq() {
+    safeHide("freq-test-area");
+    safeHide("freq-results-area");
+    safeShow("mode-select");
+  };
+})();
+
+
 
 // ---------- DIN Test Code ----------
 

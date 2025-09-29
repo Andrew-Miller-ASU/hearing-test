@@ -27,6 +27,7 @@
        <button onclick="startTest('headphones')">🎧 Headphones (Left & Right)</button>
        <button onclick="startDbHlTest()">dB HL Testing</button>
        <button onclick="DinCalibrationPage()">DIN Test</button>
+       <button onclick="startFreqTest()">Frequency Range (Highest Only)</button>
     </div>
     <div id="test-area" style="display: none;">
       <p><em>Click "Play", then tell us if you can hear the sound. This helps check your hearing sensitivity at different tones.</em></p>
@@ -36,6 +37,8 @@
       <button onclick="recordResponse(false)">No</button>
     </div>
 
+    <!--- dB HL Test Area ---->
+    
     <div id="dbhl-test-area" style="display:none;">
       <p style="margin-bottom:12px; text-align: left;">Decibels Hearing Level, or dB HL, is a measure of the quietest sound you can hear relative to a person with normal hearing. If your dB HL is negative, then you hear better than average; if it's positive, then you hear worse than average. -10 to 15 dB is considered a normal range.</p>
       <p style="margin-bottom:12px; text-align: left;">This test will measure your dB HL by playing a 1 kHz tone for 1 second and seeing how you respond. If you can't hear the sound, then click "No", and it will become slightly louder. Once you're able to hear the tone, click "Yes" to end the test and receive your results.</p>
@@ -61,6 +64,11 @@
       <p id="dbhl-result" style="font-weight:600; margin-top:10px;"></p>
       <pre id="dbhl-log" style="background:#f8f9fa; padding:10px; border-radius:8px; max-height:200px; overflow:auto; margin-top:8px;"></pre>
     </div>
+
+    <!--- End dB HL Test Area ---->
+
+
+    <!---- Digits-in-Noise Test Area ----> 
 
     <div id="din-test-area" style="display:none;">
       <p style="margin-bottom:12px; text-align:left;">The Digits-in-Noise Test will measure your ability to discern speech in the presence of background noise.</p>
@@ -111,6 +119,72 @@
         <button id="din-restart-btn" onclick="resetDinTest()">Restart</button>
       </section>
     </div>
+    
+    
+    <!--- End Digits-in-Noise Test Area -->
+    
+    
+    
+    <!-- Highest-Audible Frequency Test (frontend only; audio is a placeholder) -->
+    <div id="freq-test-area" style="display:none;">
+      <p style="margin-bottom:12px; text-align:left;">
+        Use the slider to adjust the tone. When you reach the <strong>highest pitch you can still hear</strong>, click “Mark Highest Audible.”
+      </p>
+
+      <div style="display:flex; align-items:center; gap:12px; margin:12px 0;">
+        <label for="freq-slider">Frequency:</label>
+        <input
+              id="freq-slider"
+              type="range"
+              min="20"
+              max="20000"
+              step="1"
+              value="1000"
+              aria-label="Frequency (Hz)"
+              oninput="updateFreqReadout()" />
+        <span id="freq-readout">1,000 Hz</span>
+      </div>
+
+      <div style="display:flex; gap:12px; margin:12px 0;">
+        <button id="freq-play-btn" onclick="freqPlayPlaceholder()">Play (placeholder)</button>
+        <button id="freq-stop-btn" onclick="freqStopPlaceholder()">Stop (placeholder)</button>
+      </div>
+
+      <div style="display:flex; gap:12px; margin:12px 0;">
+        <button id="mark-highest-btn" onclick="markHighestFrequency()">Mark Highest Audible</button>
+        <button onclick="backToModesFromFreq()">Back to Modes</button>
+      </div>
+
+      <p id="freq-status" style="font-style:italic;"></p>
+    </div>
+
+    <!-- Results for the Highest-Audible Frequency Test -->
+    <section id="freq-results-area" style="display:none; margin-top:24px;">
+      <h3 style="margin-bottom:8px;">Frequency Test Result</h3>
+      <p id="freq-result-text"></p>
+      <figure id="freq-norms" class="norms-figure">
+          <img
+            src="charts/High_Frequency_Hearing_Test_Age_Norms.png"
+            alt="Age norms for highest audible frequency"
+            class="norms-img"
+            loading="lazy"
+            decoding="async"
+          />
+          <figcaption class="norms-cap">Age norms (highest audible frequency).</figcaption>
+      </figure>
+      <div style="display:flex; gap:12px; margin-top:12px;">
+        <button onclick="restartFreqTest()">Restart</button>
+        <button onclick="backToModesFromFreq()">Back to Modes</button>
+      </div>
+    </section>
+
+   <!-- End Highest-Audible Frequency Test -->
+
+
+
+    
+    
+
 
     <!-- Results will appear here -->
     <!-- Always-visible summary -->

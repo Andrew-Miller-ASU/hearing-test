@@ -15,7 +15,7 @@ OUTPUT_FOLDER = os.path.join(AUDIO_FOLDER, "triplets")
 DIGITS_FOLDER = os.path.join(OUTPUT_FOLDER, "digits")  # fixed location 
 
 GAP_MS = 300
-NUM_TRIPLETS = 240
+# NUM_TRIPLETS = 240   not needed we generate all 1000 triplets
 
 
 def load_digits():
