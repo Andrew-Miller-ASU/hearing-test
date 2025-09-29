@@ -54,6 +54,43 @@ function getSourceNodeWithGain(ctx, audioBuffer, gainAmount)
   return srcNode;
 } 
 
+// Creates an OscillatorNode, which is a type of SourceNode
+// The audio can be played by calling start() and stopped by calling stop()
+// The frequency can be changed at any time by setting the frequency.value property
+function getOscillatorNode(ctx, frequency)
+{
+  const oscNode = ctx.createOscillator();
+
+  oscNode.type = "sine";                    // Specifies the shape of the waveform; options include "sine", "square", "sawtooth", "triangle" and "custom"
+  oscNode.frequency.value = frequency;      // Sets the frequency (in Hz) using the specified value
+
+  oscNode.connect(ctx.destination);
+  return oscNode;
+}
+
+// Creates an OscillatorNode, which is a type of SourceNode
+// Attaches the OscillatorNode to a GainNode, which can be used to adjust gain (volume)
+// The audio can be played by calling start() and stopped by calling stop()
+// The frequency can be changed at any time by setting the frequency.value property
+function getOscillatorNodeWithGain(ctx, frequency, gainAmount)
+{
+  const oscNode = ctx.createOscillator();
+
+  oscNode.type = "sine";                    // Specifies the shape of the waveform; options include "sine", "square", "sawtooth", "triangle" and "custom"
+  oscNode.frequency.value = frequency;      // Sets the frequency (in Hz) using the specified value
+
+  const gainNode = ctx.createGain();
+  gainNode.gain.value = gainAmount;
+
+  oscNode.connect(gainNode).connect(ctx.destination);
+  return oscNode;
+}
+
+
+// ---------- Frequency Test Code ----------
+
+const INIT_FREQ = 1000;         // Specifies the initial position of the input slider
+
 /***********************
  * Highest-Only Frequency Test (frontend-only)
  * - Adds a mode from the existing mode-select
@@ -61,9 +98,10 @@ function getSourceNodeWithGain(ctx, audioBuffer, gainAmount)
  * - Results screen replaces the test UI after marking
  ***********************/
 
-(function () {
+(async function () {
   // --- Local state
-  let freqCurrentHz = 1000;
+  let ctx = await getAudioContext();
+  let freqCurrentHz = INIT_FREQ;
   let freqHighestHz = null;
   let freqPlaying = false;
 
@@ -113,22 +151,23 @@ function getSourceNodeWithGain(ctx, audioBuffer, gainAmount)
     freqCurrentHz = Math.round(v);
     if ($("freq-readout")) $("freq-readout").textContent = freqFmtHz(freqCurrentHz);
 
-    // If you later implement live audio, you could update the tone frequency here.
-    if (freqPlaying) {
-      // BACKEND HOOK: update current playing tone frequency here
+    if (freqPlaying) {                                        // Check if the tone is currently playing
+      oscNode.frequency.value = freqCurrentHz;                // Adjust the frequency value of the OscillatorNode based on user input (applies immediately)
+      setFreqStatus(`Playing ${freqFmtHz(freqCurrentHz)}`);   // Update the status message
     }
   };
 
   window.freqPlayPlaceholder = function freqPlayPlaceholder() {
-    // BACKEND HOOK: Start real audio here (Web Audio or backend call)
+    oscNode = getOscillatorNodeWithGain(ctx, freqCurrentHz, 0.25);   // Create the OscillatorNode to play the tone (at the freqency determined by the input slider)
+    oscNode.start();                                                 // Play the tone
     freqPlaying = true;
-    setFreqStatus(`Playing ${freqFmtHz(freqCurrentHz)} (placeholder)`);
+    setFreqStatus(`Playing ${freqFmtHz(freqCurrentHz)}`);
   };
 
   window.freqStopPlaceholder = function freqStopPlaceholder() {
-    // BACKEND HOOK: Stop real audio here
+    oscNode.stop()                                                    // Stop playing the tone
     freqPlaying = false;
-    setFreqStatus("Stopped (placeholder)");
+    setFreqStatus("Stopped");
   };
 
   window.markHighestFrequency = function markHighestFrequency() {
