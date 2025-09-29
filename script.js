@@ -95,6 +95,31 @@ function storeRoundData(digitsPlayed, digitsHeard)
   });
 }
 
+async function DinCalibrationPage(){ //Calibration page for DIN Test
+
+  document.getElementById("mode-select").style.display = "none";
+  document.getElementById("din-calibration-page").style.display = "block";
+
+  
+  document.getElementById("din_calibration_test_volume_btn").addEventListener("click", async () => {
+
+      let triplet = null;
+      triplet = getRandomDigitTriplet();
+      await playTriplet(triplet, 1);
+      
+
+  });
+
+  document.getElementById("din_calibration_proceed_to_test_btn").addEventListener("click", async () => {
+
+      document.getElementById("din-calibration-page").style.display = "none";
+      startDinTest();
+
+  });
+  
+
+}
+
 function resetDinTest()
 {
   currentRound = 1;
