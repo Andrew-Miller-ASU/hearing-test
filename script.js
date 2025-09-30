@@ -105,6 +105,8 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
   let freqHighestHz = null;
   let freqPlaying = false;
 
+  let oscNode = null;
+
   function $(id) { return document.getElementById(id); }
   function safeHide(id) { const el = $(id); if (el) el.style.display = "none"; }
   function safeShow(id, disp = "block") { const el = $(id); if (el) el.style.display = disp; }
@@ -151,17 +153,19 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
     freqCurrentHz = Math.round(v);
     if ($("freq-readout")) $("freq-readout").textContent = freqFmtHz(freqCurrentHz);
 
-    if (freqPlaying) {                                        // Check if the tone is currently playing
+    if (freqPlaying) {                                        // Only adjust the frequency if the tone is currently playing
       oscNode.frequency.value = freqCurrentHz;                // Adjust the frequency value of the OscillatorNode based on user input (applies immediately)
       setFreqStatus(`Playing ${freqFmtHz(freqCurrentHz)}`);   // Update the status message
     }
   };
 
   window.freqPlayPlaceholder = function freqPlayPlaceholder() {
-    oscNode = getOscillatorNodeWithGain(ctx, freqCurrentHz, 0.25);   // Create the OscillatorNode to play the tone (at the freqency determined by the input slider)
-    oscNode.start();                                                 // Play the tone
-    freqPlaying = true;
-    setFreqStatus(`Playing ${freqFmtHz(freqCurrentHz)}`);
+    if (!freqPlaying) {                                                // Only start the tone if it's not already playing
+      oscNode = getOscillatorNodeWithGain(ctx, freqCurrentHz, 0.25);   // Create the OscillatorNode to play the tone (at the freqency determined by the input slider)
+      oscNode.start();                                                 // Play the tone
+      freqPlaying = true;
+      setFreqStatus(`Playing ${freqFmtHz(freqCurrentHz)}`);
+    }
   };
 
   window.freqStopPlaceholder = function freqStopPlaceholder() {
@@ -192,13 +196,34 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
   };
 
   window.backToModesFromFreq = function backToModesFromFreq() {
+    oscNode.stop();
+    freqPlaying = false;
     safeHide("freq-test-area");
     safeHide("freq-results-area");
     safeShow("mode-select");
   };
+
+  // Automatically stop the tone playback if the user leaves the test
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      oscNode.stop();
+      freqPlaying = false;
+    }
+  });
+  window.addEventListener("load", () => { 
+    oscNode.stop();
+    freqPlaying = false;
+  });
+  window.addEventListener("beforeunload", () => { 
+    oscNode.stop();
+    freqPlaying = false;
+  });
+    window.addEventListener("pagehide", () => { 
+    oscNode.stop();
+    freqPlaying = false;
+  });
+
 })();
-
-
 
 // ---------- DIN Test Code ----------
 
