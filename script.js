@@ -134,17 +134,19 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
     safeHide("freq-results-area");
 
     // Reset local state
-    freqCurrentHz = 1000;
+    freqCurrentHz = 2000;
     freqHighestHz = null;
     freqPlaying = false;
 
     // Reset UI
-    if ($("freq-slider")) $("freq-slider").value = "1000";
-    if ($("freq-readout")) $("freq-readout").textContent = "1,000 Hz";
+    if ($("freq-slider")) $("freq-slider").value = "2000";
+    if ($("freq-readout")) $("freq-readout").textContent = "2 kHz";
+    if ($("next_suggested_frequency")) $("next_suggested_frequency").textContent = `Next Suggested Frequency Check: 3,000 Hz or 3 kHz`;
     setFreqStatus("Ready");
 
     // Show our area
     safeShow("freq-test-area");
+    document.getElementById("next_suggested_frequency").style.fontWeight = 'bold';
   };
 
   // --- UI handlers (wired via inline onclick/oninput in HTML)
@@ -157,7 +159,23 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
       oscNode.frequency.value = freqCurrentHz;                // Adjust the frequency value of the OscillatorNode based on user input (applies immediately)
       setFreqStatus(`Playing ${freqFmtHz(freqCurrentHz)}`);   // Update the status message
     }
+    let nextSuggestedFreq; // variable for the next suggested frequency for the user to check
+
+    if(freqCurrentHz < 6000){     // the range for hearing loss is 2000-6000 hz, but it can get murky in the 7-8 kHz range. To be safe, start slowing down the increments from 1000 to 500 around this mark.
+
+      nextSuggestedFreq = freqCurrentHz + 1000; // recommend the user jumps 1000 hz
+    }
+    else{
+
+      nextSuggestedFreq = freqCurrentHz + 500; // recommend the user jumps 500 hz
+    }
+
+    if ($("next_suggested_frequency")) $("next_suggested_frequency").textContent = `Next Suggested Frequency Check: ${nextSuggestedFreq} Hz or ${freqFmtHz(nextSuggestedFreq)}`;
+    
+
   };
+
+  let freqStopTimer;  // This is the timer variable to stop the frequency sound after a certain duration.
 
   window.freqPlayPlaceholder = function freqPlayPlaceholder() {
     if (!freqPlaying) {                                                // Only start the tone if it's not already playing
@@ -165,6 +183,16 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
       oscNode.start();                                                 // Play the tone
       freqPlaying = true;
       setFreqStatus(`Playing ${freqFmtHz(freqCurrentHz)}`);
+
+      if(freqStopTimer != null){  // make sure the timer variable has a reference
+        clearTimeout(freqStopTimer);  // reset timer variable timer
+      }
+      if(freqPlaying){  // don't worry about this if the user stopped the sound before this point
+
+        freqStopTimer = setTimeout(freqStopPlaceholder, 3000); // stop after 3 seconds
+      }
+      
+      
     }
   };
 
