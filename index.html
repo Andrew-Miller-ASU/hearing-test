@@ -128,26 +128,38 @@
     <!-- Highest-Audible Frequency Test (frontend only; audio is a placeholder) -->
     <div id="freq-test-area" style="display:none;">
       <p style="margin-bottom:12px; text-align:left;">
-        Use the slider to adjust the tone. When you reach the <strong>highest pitch you can still hear</strong>, click “Mark Highest Audible.”
+        Use the textbox to adjust the tone. Click the "Play" button to play the sound, which will stop automatically after a few seconds.
+        If you want to stop the sound before then, click the "Stop" button. 
+        When you reach the <strong>highest pitch you can still hear</strong>, click “Mark Highest Audible.”
+        We recommend that you follow the "Next Suggested Frequency" listed below the textbox for a quick, yet efficient test, but you may follow
+        your own judgement should you choose to.
       </p>
 
       <div style="display:flex; align-items:center; gap:12px; margin:12px 0;">
         <label for="freq-slider">Frequency:</label>
         <input
               id="freq-slider"
-              type="range"
-              min="20"
+              type="number"
+              min="2000"
               max="20000"
-              step="1"
+              step="500"
               value="1000"
               aria-label="Frequency (Hz)"
-              oninput="updateFreqReadout()" />
+              oninput="updateFreqReadout()" 
+              />
         <span id="freq-readout">1,000 Hz</span>
       </div>
 
       <div style="display:flex; gap:12px; margin:12px 0;">
-        <button id="freq-play-btn" onclick="freqPlayPlaceholder()">Play</button>
-        <button id="freq-stop-btn" onclick="freqStopPlaceholder()">Stop</button>
+        <button id="freq-play-btn" onclick="freqPlayPlaceholder()"
+        style="background:#16a34a; color:#fff; padding:8px 12px; 
+        border:none; border-radius:8px; font-weight:600; cursor:pointer;"
+        >Play</button>
+        <button id="freq-stop-btn" onclick="freqStopPlaceholder()"
+        style="background:#dc2626; color:#fff; padding:8px 12px;
+         border:none; border-radius:8px; font-weight:600; cursor:pointer;"
+        >Stop</button>
+        <span style="align-items:center; gap:12px; margin: 15px;" id="next_suggested_frequency"><b>Next Suggested Frequency Check: 3,000 Hz or 3 kHz</b></span>
       </div>
 
       <div style="display:flex; gap:12px; margin:12px 0;">
@@ -171,15 +183,15 @@
             decoding="async"
           />
           <figcaption class="norms-cap">Age norms (highest audible frequency).</figcaption>
-        <p id="freq-results-norms-chart-explanation">
-          The typical highest frequency range for hearing loss is between 2 kHz and 8 kHz. 
-          If you fall in this range, consult with a specialist. 
-          If you fall below the typical highest range for your demographic, 
-          but can hear frequencies above 8 kHz, do not panic. While it might be a sign of frailty,
-          either now or for the future, you are still above the range where hearing loss is typically
-          found.
-        </p>
       </figure>
+      <p id="freq-results-norms-chart-explanation">
+        <strong>The typical highest frequency range for hearing loss is between 2 kHz and 8 kHz. 
+        If you fall in this range, consult with a specialist. </strong>
+        If you fall below the typical highest range for your demographic, 
+        but can hear frequencies above 8 kHz, do not panic. While it might be a sign of frailty,
+        either now or for the future, you are still above the range where hearing loss is typically
+        found.
+      </p>
       <div style="display:flex; gap:12px; margin-top:12px;">
         <button onclick="restartFreqTest()">Restart</button>
         <button onclick="backToModesFromFreq()">Back to Modes</button>
