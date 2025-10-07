@@ -279,7 +279,8 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
 
 // ---------- DIN Test Code ----------
 
-const DIN_TEST_AUDIO_PATH = "audio/triplets/";    // Audio files for every spoken 3-digit combination and background noise
+const DIN_TEST_TRIPLETS_PATH = "audio/din_test/triplets_normalized/";    // Audio files for every spoken 3-digit combination (normalized)
+const DIN_TEST_NOISE_PATH = "audio/din_test/din_noise.wav";              // Background noise audio file
 const NOISE_BUFFER_DURATION = 0.5;                 // Amount of time (in seconds) the noise will play before and after the spoken digits
 const TOTAL_TEST_ROUNDS = 15;                      // The total number of rounds until the test automatically ends
 
@@ -461,11 +462,11 @@ async function playTriplet(triplet, gainAmount)
   const ctx = await getAudioContext();
 
   // Create the AudioBuffer for the background noise, which can be reused throughout the entire test
-  if (!noiseAudioBuffer) noiseAudioBuffer = await getAudioBufferFromUrl(ctx, `${DIN_TEST_AUDIO_PATH}din_noise.wav`);
+  if (!noiseAudioBuffer) noiseAudioBuffer = await getAudioBufferFromUrl(ctx, DIN_TEST_NOISE_PATH);
   let noiseSourceNode = getSourceNodeWithGain(ctx, noiseAudioBuffer, gainAmount);               // Create SourceNode to allow for noise playback
 
-  let digitsAudioBuffer = await getAudioBufferFromUrl(ctx, `${DIN_TEST_AUDIO_PATH}${triplet}.wav`);   // Create AudioBuffer for triplet audio
-  let digitsSourceNode = getSourceNode(ctx, digitsAudioBuffer);                                       // Create SourceNode to allow for digits playback
+  let digitsAudioBuffer = await getAudioBufferFromUrl(ctx, `${DIN_TEST_TRIPLETS_PATH}${triplet}.wav`);   // Create AudioBuffer for triplet audio
+  let digitsSourceNode = getSourceNode(ctx, digitsAudioBuffer);                                          // Create SourceNode to allow for digits playback
 
   const t0 = ctx.currentTime + 0.02;                      // Current time
 

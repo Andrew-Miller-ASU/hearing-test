@@ -10,9 +10,9 @@ import random
 from pydub import AudioSegment
 import itertools
 
-AUDIO_FOLDER = "audio"
-OUTPUT_FOLDER = os.path.join(AUDIO_FOLDER, "triplets")
-DIGITS_FOLDER = os.path.join(OUTPUT_FOLDER, "digits")  # fixed location 
+AUDIO_FOLDER = os.path.join("audio", "din_test")
+OUTPUT_FOLDER = os.path.join(AUDIO_FOLDER, "triplets_normalized")
+DIGITS_FOLDER = os.path.join(AUDIO_FOLDER, "digits_normalized")  # fixed location 
 
 GAP_MS = 300
 # NUM_TRIPLETS = 240   not needed we generate all 1000 triplets
