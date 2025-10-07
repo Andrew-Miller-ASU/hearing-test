@@ -159,20 +159,44 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
       oscNode.frequency.value = freqCurrentHz;                // Adjust the frequency value of the OscillatorNode based on user input (applies immediately)
       setFreqStatus(`Playing ${freqFmtHz(freqCurrentHz)}`);   // Update the status message
     }
+    
     let nextSuggestedFreq; // variable for the next suggested frequency for the user to check
 
     if(freqCurrentHz < 6000){     // the range for hearing loss is 2000-6000 hz, but it can get murky in the 7-8 kHz range. To be safe, start slowing down the increments from 1000 to 500 around this mark.
 
       nextSuggestedFreq = freqCurrentHz + 1000; // recommend the user jumps 1000 hz
+      document.getElementById("freq-slider").step = 1000;
     }
     else{
 
       nextSuggestedFreq = freqCurrentHz + 500; // recommend the user jumps 500 hz
+      document.getElementById("freq-slider").step = 500;
     }
 
     if ($("next_suggested_frequency")) $("next_suggested_frequency").textContent = `Next Suggested Frequency Check: ${nextSuggestedFreq} Hz or ${freqFmtHz(nextSuggestedFreq)}`;
     
 
+  };
+
+  window.prepareFreqTestForNextFreq = function prepareFreqTestForNextFreq(){ //automatically set the value of the input to be the next suggested freq
+
+    let freqInput = document.getElementById("freq-slider");
+    
+
+    if(freqInput.value < 6000){     // the range for hearing loss is 2000-6000 hz, but it can get murky in the 7-8 kHz range. To be safe, start slowing down the increments from 1000 to 500 around this mark.
+
+      temp = parseInt(freqInput.value, 10);
+      freqInput.value = temp + 1000;
+      
+    }
+    else{
+
+      temp = parseInt(freqInput.value, 10);
+      freqInput.value = temp + 500;
+      
+    }
+
+    updateFreqReadout();
   };
 
   let freqStopTimer;  // This is the timer variable to stop the frequency sound after a certain duration.
