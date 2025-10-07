@@ -128,11 +128,13 @@
     <!-- Highest-Audible Frequency Test (frontend only; audio is a placeholder) -->
     <div id="freq-test-area" style="display:none;">
       <p style="margin-bottom:12px; text-align:left;">
-        Use the textbox to adjust the tone. Click the "Play" button to play the sound, which will stop automatically after a few seconds.
+        Click the "Play" button to play the sound, which will stop automatically after a few seconds.
         If you want to stop the sound before then, click the "Stop" button. 
+        If you can still hear the tone, click the "I Can Still Hear It" button and the test will automatically prepare the next frequency for you.
+        Click the "Play" button again when ready. If you need to manually change the frequency for any reason, you can do so with the up and down arrows on the right of the input box.
         When you reach the <strong>highest pitch you can still hear</strong>, click “Mark Highest Audible.”
-        We recommend that you follow the "Next Suggested Frequency" listed below the textbox for a quick, yet efficient test, but you may follow
-        your own judgement should you choose to.
+        We recommend that you follow the "Next Suggested Frequency" listed below the textbox for a quick, yet efficient test, which will be done automatically with the "I Can Still Hear It" button. 
+        However, you may follow your own judgement should you choose to. The test uses frequencies ranging from 2 kHz to 20 kHz.
       </p>
 
       <div style="display:flex; align-items:center; gap:12px; margin:12px 0;">
@@ -142,9 +144,10 @@
               type="number"
               min="2000"
               max="20000"
-              step="500"
+              step="1000"
               value="1000"
               aria-label="Frequency (Hz)"
+              onkeydown = "return false"
               oninput="updateFreqReadout()" 
               />
         <span id="freq-readout">1,000 Hz</span>
@@ -164,6 +167,7 @@
 
       <div style="display:flex; gap:12px; margin:12px 0;">
         <button id="mark-highest-btn" onclick="markHighestFrequency()">Mark Highest Audible</button>
+        <button id="still-audible-btn" onclick="prepareFreqTestForNextFreq()">I Can Still Hear It</button>
         <button onclick="backToModesFromFreq()">Back to Modes</button>
       </div>
 
