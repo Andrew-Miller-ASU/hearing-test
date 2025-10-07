@@ -111,11 +111,15 @@
               <th style="text-align:center; border-bottom:2px solid #e5e7eb; padding:8px;">Digits played</th>
               <th style="text-align:center; border-bottom:2px solid #e5e7eb; padding:8px;">Digits heard</th>
               <th style="text-align:center; border-bottom:2px solid #e5e7eb; padding:8px;">Result</th>
+              <th style="text-align:center; border-bottom:2px solid #e5e7eb; padding:8px;">SNR</th>
             </tr>
           </thead>
           <tbody id="din-results-tbody"></tbody>
         </table>
-        <p id="din-correct-percent-display" style="margin-top:12px; margin-bottom:12px; text-align:left; font-weight:bold;"></p>
+        <p id="din-best-snr-display" style="margin-top:12px; margin-bottom:12px; text-align:left; font-weight:bold;"></p>
+        <div style="text-align: left;">
+          <img src="charts/din_snr_norms.png" width="400">
+        </div>
         <button id="din-restart-btn" onclick="resetDinTest()">Restart</button>
       </section>
     </div>

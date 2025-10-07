@@ -282,7 +282,22 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
 const DIN_TEST_TRIPLETS_PATH = "audio/din_test/triplets_normalized/";    // Audio files for every spoken 3-digit combination (normalized)
 const DIN_TEST_NOISE_PATH = "audio/din_test/din_noise.wav";              // Background noise audio file
 const NOISE_BUFFER_DURATION = 0.5;                 // Amount of time (in seconds) the noise will play before and after the spoken digits
-const TOTAL_TEST_ROUNDS = 15;                      // The total number of rounds until the test automatically ends
+const TOTAL_TEST_ROUNDS = 10;                      // The total number of rounds until the test automatically ends
+
+const DIGITS_RMS_DBFS = -20.00;                     // RMS dBFS (average relative volume) that all digit audio was normalized to; used for calculation of SNR
+const NOISE_RMS_DBFS = -29.29;                      // RMS dBFS (average relative volume) of the noise audio; used for calculation of SNR
+
+// Utility function to calculate RMS dBFS for a piece of audio after a linear gain has been applied (given the base RMS dBFS of the audio)
+function calculateRmsDbfsAfterGain(baseRmsDbfs, gainAmount)
+{
+  return baseRmsDbfs + (20 * Math.log10(gainAmount));
+}
+
+// Utility function to calculate SNR (signal-to-noise ratio) for the DIN test, given the noise gain amount for the current round
+function calculateSNR(noiseGainAmount)
+{
+  return DIGITS_RMS_DBFS - calculateRmsDbfsAfterGain(NOISE_RMS_DBFS, noiseGainAmount);
+}
 
 // Returns a random combination of 3 digits as a string
 function getRandomDigitTriplet()
@@ -297,13 +312,13 @@ let digitsAudioBuffer = null;
 let currentRound = 1; 
 
 // Stores data for each round of the test
-let dinTestData = [];  // Contains items: { roundNumber, digitsPlayed, digitsHeard, result }
+let dinTestData = [];  // Contains items: { roundNumber, digitsPlayed, digitsHeard, result, snr }
 
 // Given a number representing the current round of the test, this function will return the gain amount that should be used in that round
 function getGainForRound(roundNumber)
 {
-  let baseGainAmount = 0.25;           // Initial noise gain (i.e., the volume of the noise in round 1)
-  let gainIncrementPerRound = 0.25;    // The amount by which the gain will be incremented for each successive round
+  let baseGainAmount = 3;           // Initial noise gain (i.e., the volume of the noise in round 1)
+  let gainIncrementPerRound = 0.5;    // The amount by which the gain will be incremented for each successive round
 
   return baseGainAmount + ((roundNumber - 1) * gainIncrementPerRound);    // Formula for calculating the gain amount for the specified round
 }
@@ -314,7 +329,8 @@ function storeRoundData(digitsPlayed, digitsHeard)
     roundNumber: currentRound,
     digitsPlayed,
     digitsHeard,
-    result: digitsPlayed === digitsHeard
+    result: digitsPlayed === digitsHeard,
+    snr: calculateSNR(getGainForRound(currentRound))       // Calculate SNR for the current round, based on that round's noise gain level
   });
 }
 
@@ -438,22 +454,28 @@ function endDinTest()
     tdResult.style.fontWeight = "700";
     tdResult.style.color = row.result ? "#16a34a" : "#dc2626";
 
-    tr.append(tdRound, tdDigitsPlayed, tdDigitsHeard, tdResult);
+    const tdSnr = document.createElement("td");
+    tdSnr.textContent = `${row.snr.toFixed(2)} dB`;
+    tdSnr.style.padding = "8px";
+    tdSnr.style.borderBottom = "1px solid #f1f5f9";
+
+    tr.append(tdRound, tdDigitsPlayed, tdDigitsHeard, tdResult, tdSnr);
     tbody.appendChild(tr);
   }
 
-  // Calculate the percentage of rounds the user got correct
+  // Find the user's best SNR score (the lowest SNR in a round that the user got correct)
 
-  let correctResultCount = 0;
+  let lowestSnr = Infinity;
+
   for (const item of dinTestData)
   {
-    if (item.result) correctResultCount++;
+    if (item.result === true && item.snr < lowestSnr) lowestSnr = item.snr;
   }
-  let correctPercentage = (100 * (correctResultCount / dinTestData.length)).toFixed(2) + "%";
 
-  document.getElementById("din-test-controls").style.display = "none";                                            // Hide the controls for an active test
-  document.getElementById("din-correct-percent-display").textContent = "Correct rounds: " + correctPercentage;    // Display the percentage of correct rounds
-  document.getElementById("din-results-section").style.display = "block";                                         // Show the end-of-test results table
+  document.getElementById("din-test-controls").style.display = "none";                                                      // Hide the controls for an active test
+  document.getElementById("din-best-snr-display").textContent =                                                             // Display the user's best (lowest) SNR score
+    `Your best SNR score was: ${lowestSnr === Infinity ? 'N/A (Too high to be measured)' : `${lowestSnr.toFixed(2)} dB`}`;
+  document.getElementById("din-results-section").style.display = "block";                                                   // Show the end-of-test results table
 }
 
 // Given a digit triplet and gain amount, will play the audio for the digit triplet concurrently with the noise audio (with the specified gain adjustment)
@@ -463,7 +485,7 @@ async function playTriplet(triplet, gainAmount)
 
   // Create the AudioBuffer for the background noise, which can be reused throughout the entire test
   if (!noiseAudioBuffer) noiseAudioBuffer = await getAudioBufferFromUrl(ctx, DIN_TEST_NOISE_PATH);
-  let noiseSourceNode = getSourceNodeWithGain(ctx, noiseAudioBuffer, gainAmount);               // Create SourceNode to allow for noise playback
+  let noiseSourceNode = getSourceNodeWithGain(ctx, noiseAudioBuffer, gainAmount);   // Create SourceNode to allow for noise playback
 
   let digitsAudioBuffer = await getAudioBufferFromUrl(ctx, `${DIN_TEST_TRIPLETS_PATH}${triplet}.wav`);   // Create AudioBuffer for triplet audio
   let digitsSourceNode = getSourceNode(ctx, digitsAudioBuffer);                                          // Create SourceNode to allow for digits playback
