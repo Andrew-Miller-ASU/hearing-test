@@ -150,6 +150,9 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
   };
 
   // --- UI handlers (wired via inline onclick/oninput in HTML)
+
+  let freqStopTimer;  // This is the timer variable to stop the frequency sound after a certain duration.
+
   window.updateFreqReadout = function updateFreqReadout() {
     const v = Number(($("freq-slider") || {}).value || 1000);
     freqCurrentHz = Math.round(v);
@@ -196,11 +199,17 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
       
     }
 
+    if(freqStopTimer != null){
+
+      clearTimeout(freqStopTimer);
+      freqStopTimer = setTimeout(freqStopPlaceholder, 3000); // stop after 3 seconds
+    }
+
+    
     updateFreqReadout();
   };
 
-  let freqStopTimer;  // This is the timer variable to stop the frequency sound after a certain duration.
-
+  
   window.freqPlayPlaceholder = function freqPlayPlaceholder() {
     if (!freqPlaying) {                                                // Only start the tone if it's not already playing
       oscNode = getOscillatorNodeWithGain(ctx, freqCurrentHz, 0.25);   // Create the OscillatorNode to play the tone (at the freqency determined by the input slider)
