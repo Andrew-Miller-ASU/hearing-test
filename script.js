@@ -164,26 +164,27 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
     }
     
     let nextSuggestedFreq; // variable for the next suggested frequency for the user to check
+    if(freqCurrentHz < 20000){
+      if(freqCurrentHz < 6000){     // the range for hearing loss is 2000-6000 hz, but it can get murky in the 7-8 kHz range. To be safe, start slowing down the increments from 1000 to 500 around this mark.
 
-    if(freqCurrentHz < 6000){     // the range for hearing loss is 2000-6000 hz, but it can get murky in the 7-8 kHz range. To be safe, start slowing down the increments from 1000 to 500 around this mark.
+        nextSuggestedFreq = freqCurrentHz + 1000; // recommend the user jumps 1000 hz
+        document.getElementById("freq-slider").step = 1000;
+      }
+      else{
 
-      nextSuggestedFreq = freqCurrentHz + 1000; // recommend the user jumps 1000 hz
-      document.getElementById("freq-slider").step = 1000;
+        nextSuggestedFreq = freqCurrentHz + 500; // recommend the user jumps 500 hz
+        document.getElementById("freq-slider").step = 500;
+      }
+
+      if ($("next_suggested_frequency")) $("next_suggested_frequency").textContent = `Next Suggested Frequency Check: ${nextSuggestedFreq} Hz or ${freqFmtHz(nextSuggestedFreq)}`;
     }
-    else{
-
-      nextSuggestedFreq = freqCurrentHz + 500; // recommend the user jumps 500 hz
-      document.getElementById("freq-slider").step = 500;
-    }
-
-    if ($("next_suggested_frequency")) $("next_suggested_frequency").textContent = `Next Suggested Frequency Check: ${nextSuggestedFreq} Hz or ${freqFmtHz(nextSuggestedFreq)}`;
-    
 
   };
 
   window.prepareFreqTestForNextFreq = function prepareFreqTestForNextFreq(){ //automatically set the value of the input to be the next suggested freq
 
     let freqInput = document.getElementById("freq-slider");
+    
     
 
     if(freqInput.value < 6000){     // the range for hearing loss is 2000-6000 hz, but it can get murky in the 7-8 kHz range. To be safe, start slowing down the increments from 1000 to 500 around this mark.
@@ -199,6 +200,8 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
       
     }
 
+    
+
     if(freqStopTimer != null){
 
       clearTimeout(freqStopTimer);
@@ -207,6 +210,64 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
 
     
     updateFreqReadout();
+  };
+
+  window.eventListenerForFreqIncBtn = function eventListenerForFreqIncBtn(){
+
+      let freqInput = document.getElementById("freq-slider");
+
+      if(parseInt(freqInput.value, 10) < 20000){
+        if(freqInput.value < 6000){     // the range for hearing loss is 2000-6000 hz, but it can get murky in the 7-8 kHz range. To be safe, start slowing down the increments from 1000 to 500 around this mark.
+
+          temp = parseInt(freqInput.value, 10);
+          freqInput.value = temp + 1000;
+        
+        }
+        else{
+
+          temp = parseInt(freqInput.value, 10);
+          freqInput.value = temp + 500;
+          
+        }
+        updateFreqReadout();
+
+        if(freqStopTimer != null){
+
+          clearTimeout(freqStopTimer);
+          freqStopTimer = setTimeout(freqStopPlaceholder, 3000); // stop after 3 seconds
+        }
+      }
+
+    
+
+  };
+
+  window.eventListenerForFreqDecBtn = function eventListenerForFreqDecBtn(){
+
+      let freqInput = document.getElementById("freq-slider");
+
+      if(parseInt(freqInput.value, 10) > 2000){
+          if(freqInput.value <= 6000){     // the range for hearing loss is 2000-6000 hz, but it can get murky in the 7-8 kHz range. To be safe, start slowing down the increments from 1000 to 500 around this mark.
+
+            temp = parseInt(freqInput.value, 10);
+            freqInput.value = temp - 1000;
+          
+          }
+          else{
+
+            temp = parseInt(freqInput.value, 10);
+            freqInput.value = temp - 500;
+            
+          }
+          updateFreqReadout();
+
+          if(freqStopTimer != null){
+
+            clearTimeout(freqStopTimer);
+            freqStopTimer = setTimeout(freqStopPlaceholder, 3000); // stop after 3 seconds
+          }
+      }
+
   };
 
   
