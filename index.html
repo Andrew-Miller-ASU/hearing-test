@@ -134,10 +134,10 @@
       <p style="margin-bottom:12px; text-align:left;">
         Click the "Play" button to play the sound, which will stop automatically after a few seconds.
         If you want to stop the sound before then, click the "Stop" button. 
-        If you can still hear the tone, click the "I Can Still Hear It" button and the test will automatically prepare the next frequency for you.
-        Click the "Play" button again when ready. If you need to manually change the frequency for any reason, you can do so with the up and down arrows on the right of the input box.
-        When you reach the <strong>highest pitch you can still hear</strong>, click “Mark Highest Audible.”
-        We recommend that you follow the "Next Suggested Frequency" listed below the textbox for a quick, yet efficient test, which will be done automatically with the "I Can Still Hear It" button. 
+        If you can still hear the tone, click the "Yes, I Can Still Hear It" button and the test will automatically prepare the next frequency for you.
+        Click the "Play" button again when ready. If you need to manually change the frequency for any reason, you can do so with the "Increase" and "Decrease" buttons on the right of the box.
+        When you reach the <strong>highest pitch you can still hear</strong>, click “No, I Can't Hear It.”
+        We recommend that you follow the "Next Suggested Frequency" listed below the box for a quick, yet efficient test, which will be done automatically with the "Yes, I Can Still Hear It" button. 
         However, you may follow your own judgement should you choose to. The test uses frequencies ranging from 2 kHz to 20 kHz.
       </p>
 
@@ -148,13 +148,15 @@
               type="number"
               min="2000"
               max="20000"
-              step="1000"
+              step = "1000"
               value="1000"
               aria-label="Frequency (Hz)"
               onkeydown = "return false"
               oninput="updateFreqReadout()" 
               />
         <span id="freq-readout">1,000 Hz</span>
+        <button id="freq-slider-increase-btn" onclick="eventListenerForFreqIncBtn()">Increase</button>
+        <button id="freq-slider-decrease-btn" onclick="eventListenerForFreqDecBtn()">Decrease</button>
       </div>
 
       <div style="display:flex; gap:12px; margin:12px 0;">
@@ -170,8 +172,18 @@
       </div>
 
       <div style="display:flex; gap:12px; margin:12px 0;">
-        <button id="mark-highest-btn" onclick="markHighestFrequency()">Mark Highest Audible</button>
-        <button id="still-audible-btn" onclick="prepareFreqTestForNextFreq()">I Can Still Hear It</button>
+        <span style="align-items:center; gap:12px; margin: 15px;" id="freq_test_question_for_user"><b>Can you hear the frequency when you press "Play"?</b></span>
+      </div>
+
+      <div style="display:flex; gap:12px; margin:12px 0;">
+        <button id="still-audible-btn" onclick="prepareFreqTestForNextFreq()"
+        style="background:#16a34a; color:#fff; padding:8px 12px; 
+        border:none; border-radius:8px; font-weight:600; cursor:pointer;"
+        >Yes, I Can Still Hear It</button>
+        <button id="mark-highest-btn" onclick="markHighestFrequency()" 
+        style="background:#dc2626; color:#fff; padding:8px 12px;
+         border:none; border-radius:8px; font-weight:600; cursor:pointer;"
+         >No, I Can't Hear It</button>
         <button onclick="backToModesFromFreq()">Back to Modes</button>
       </div>
 
