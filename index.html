@@ -172,7 +172,7 @@
       </div>
 
       <div style="display:flex; gap:12px; margin:12px 0;">
-        <span style="align-items:center; gap:12px; margin: 15px;" id="freq_test_question_for_user"><b>Can you hear the frequency when you press "Play"?</b></span>
+        <span style="align-items:center; gap:12px; margin: 15px;" id="freq_test_question_for_user"><b>Can you hear the frequency when you press "Play"? Check the sound status below.</b></span>
       </div>
 
       <div style="display:flex; gap:12px; margin:12px 0;">
@@ -180,7 +180,7 @@
         style="background:#16a34a; color:#fff; padding:8px 12px; 
         border:none; border-radius:8px; font-weight:600; cursor:pointer;"
         >Yes, I Can Still Hear It</button>
-        <button id="mark-highest-btn" onclick="markHighestFrequency()" 
+        <button id="mark-highest-btn" onclick="pinpointingExactFrequencyPage()" 
         style="background:#dc2626; color:#fff; padding:8px 12px;
          border:none; border-radius:8px; font-weight:600; cursor:pointer;"
          >No, I Can't Hear It</button>
@@ -189,7 +189,58 @@
 
       <p id="freq-status" style="font-style:italic;"></p>
     </div>
+    <!-- Pinpoint Highest Audible Page for Highest-Audible Frequency Test-->
+    <div id="pinpoint_highest_audible_for_freq_test" style="display:none;">
+      <p id="pinpoint_highest_audible_for_freq_test_instructions"
+      style="margin-bottom:12px; text-align:left;"></p>
+      <div style="display:flex; align-items:center; gap:12px; margin:12px 0;">
+        <label for="freq-slider2">Frequency:</label>
+        <input
+              id="freq-slider2"
+              type="number"
+              min="2000"
+              max="20000"
+              step = "1000"
+              value="1000"
+              aria-label="Frequency (Hz)"
+              onkeydown = "return false"
+              oninput="updateFreqReadout2()" 
+              />
+        <span id="freq-readout2">1,000 Hz</span>
+        <button id="freq-slider-increase-btn" onclick="eventListenerForFreqIncBtn()">Increase</button>
+        <button id="freq-slider-decrease-btn" onclick="eventListenerForFreqDecBtn()">Decrease</button>
+      </div>
 
+      <div style="display:flex; gap:12px; margin:12px 0;">
+        <button id="freq-play-btn" onclick="freqPlayPlaceholder()"
+        style="background:#16a34a; color:#fff; padding:8px 12px; 
+        border:none; border-radius:8px; font-weight:600; cursor:pointer;"
+        >Play</button>
+        <button id="freq-stop-btn" onclick="freqStopPlaceholder()"
+        style="background:#dc2626; color:#fff; padding:8px 12px;
+         border:none; border-radius:8px; font-weight:600; cursor:pointer;"
+        >Stop</button>
+        <span style="align-items:center; gap:12px; margin: 15px; font-weight:bold;" id="next_suggested_frequency2"><b></b></span>
+      </div>
+      <div style="display:flex; gap:12px; margin:12px 0;">
+        <span style="align-items:center; gap:12px; margin: 15px;" id="freq_test_question_for_user"><b>Can you hear the frequency when you press "Play"? Check the sound status below.</b></span>
+      </div>
+
+      <div style="display:flex; gap:12px; margin:12px 0;">
+        <button id="still-audible-btn" onclick="prepareFreqTestForNextFreq()"
+        style="background:#16a34a; color:#fff; padding:8px 12px; 
+        border:none; border-radius:8px; font-weight:600; cursor:pointer;"
+        >Yes, I Can Still Hear It</button>
+        <button id="mark-highest-btn" onclick="prepareForMarkHighestFrequency()" 
+        style="background:#dc2626; color:#fff; padding:8px 12px;
+         border:none; border-radius:8px; font-weight:600; cursor:pointer;"
+         >No, I Can't Hear It</button>
+        <button onclick="backToModesFromFreq()">Back to Modes</button>
+      </div>
+
+      <p id="freq-status2" style="font-style:italic;"></p>
+    </div>
+    <!-- End of Pinpoint Highest Audible Page for Highest Audible Frequency Test-->
     <!-- Results for the Highest-Audible Frequency Test -->
     <section id="freq-results-area" style="display:none; margin-top:24px;">
       <h3 style="margin-bottom:8px;">Frequency Test Result</h3>
