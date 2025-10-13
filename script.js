@@ -26,6 +26,39 @@ async function getAudioBufferFromUrl(ctx, url)
   return await ctx.decodeAudioData(arrayBuffer.slice(0));
 }
 
+// Generates white noise with the specified duration, sample rate, and cutoff frequency (using a low-pass filter)
+// Returns an AudioBuffer object
+async function getWhiteNoiseAudioBuffer(durationSec, sampleRateHz, lowPassCutoffFreqHz)
+{
+  const numSamples = Math.floor(durationSec * sampleRateHz);
+  const offlineAudioCtx = new OfflineAudioContext(1, numSamples, sampleRateHz);
+
+  const noiseBuffer = offlineAudioCtx.createBuffer(1, numSamples, sampleRateHz);
+  const channelData = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < channelData.length; i++)
+  {
+    channelData[i] = Math.random() * 2 - 1;
+  }
+
+  const noiseSource = offlineAudioCtx.createBufferSource();
+  noiseSource.buffer = noiseBuffer;
+
+  const lowPassFilter1 = offlineAudioCtx.createBiquadFilter();
+  lowPassFilter1.type = "lowpass";
+  lowPassFilter1.frequency.value = lowPassCutoffFreqHz;
+  lowPassFilter1.Q.value = Math.SQRT1_2;
+
+  const lowPassFilter2 = offlineAudioCtx.createBiquadFilter();
+  lowPassFilter2.type = "lowpass";
+  lowPassFilter2.frequency.value = lowPassCutoffFreqHz;
+  lowPassFilter2.Q.value = Math.SQRT1_2;
+
+  noiseSource.connect(lowPassFilter1).connect(lowPassFilter2).connect(offlineAudioCtx.destination);
+  noiseSource.start();
+
+  return await offlineAudioCtx.startRendering();
+}
+
 // Creates an AudioBufferSourceNode from an AudioBuffer object
 // The audio can be played by calling start() and stopped by calling stop()
 function getSourceNode(ctx, audioBuffer)
@@ -51,7 +84,7 @@ function getSourceNodeWithGain(ctx, audioBuffer, gainAmount)
   gainNode.gain.value = gainAmount;
 
   srcNode.connect(gainNode).connect(ctx.destination);
-  return srcNode;
+  return [srcNode, gainNode];
 } 
 
 // Creates an OscillatorNode, which is a type of SourceNode
@@ -86,6 +119,79 @@ function getOscillatorNodeWithGain(ctx, frequency, gainAmount)
   return oscNode;
 }
 
+// ---------- Temporal Gap Detection Test Code ----------
+
+const NOISE_DURATION_SEC = 0.5;
+const NOISE_SAMPLE_RATE_HZ = 50000;
+const NOISE_CUTOFF_FREQ_HZ = 5000;
+const FADE_IN_OUT_DURATION_MS = 1;
+
+let noiseAudioBufferTgd = null;
+
+async function startTgdTest()
+{
+  document.getElementById("mode-select").style.display = "none";      // Hide the mode selection menu
+  document.getElementById("tgd-test-area").style.display = "block";   // Show the TGD testing interface
+
+  const playBtn = document.getElementById("tgd-play-btn");
+
+  // Play button event listener
+  playBtn.addEventListener("click", async () => {
+    gapLength = document.getElementById("gap-len-input").value;
+    gapPosition = document.getElementById("gap-pos-input").value;
+    fade = document.getElementById("fade-toggle-cb").checked;
+    playBtn.disabled = true;
+    await playNoise(gapLength, gapPosition, fade, playBtn);
+  });
+}
+
+async function playNoise(gapLengthMs, gapPositionPct, fade, playBtn)
+{
+  const ctx = await getAudioContext();
+
+  if (!noiseAudioBufferTgd) noiseAudioBufferTgd = await getWhiteNoiseAudioBuffer(NOISE_DURATION_SEC, NOISE_SAMPLE_RATE_HZ, NOISE_CUTOFF_FREQ_HZ);
+  
+  let [noiseSourceNode, noiseGainNode] = getSourceNodeWithGain(ctx, noiseAudioBufferTgd, 1.0);
+
+  let noiseStartTime = ctx.currentTime + 0.05;
+  let gapStartTime = noiseStartTime + (NOISE_DURATION_SEC * (gapPositionPct / 100));
+  let gapEndTime = gapStartTime + (gapLengthMs / 1000);
+  let noiseEndTime = noiseStartTime + NOISE_DURATION_SEC;
+
+  if (fade)
+  {
+    let rampLengthSec = FADE_IN_OUT_DURATION_MS / 1000;
+
+    noiseGainNode.gain.setValueAtTime(0, noiseStartTime);
+    noiseGainNode.gain.linearRampToValueAtTime(1, noiseStartTime + rampLengthSec);
+
+    noiseGainNode.gain.setValueAtTime(1, Math.max(noiseStartTime + rampLengthSec, gapStartTime - rampLengthSec));
+    noiseGainNode.gain.linearRampToValueAtTime(0, gapStartTime);
+
+    noiseGainNode.gain.setValueAtTime(0, gapEndTime);
+    noiseGainNode.gain.linearRampToValueAtTime(1, gapEndTime + rampLengthSec);
+
+    noiseGainNode.gain.setValueAtTime(1, Math.max(0, noiseEndTime - rampLengthSec));
+    noiseGainNode.gain.linearRampToValueAtTime(0, noiseEndTime);
+  }
+  else
+  {
+    noiseGainNode.gain.setValueAtTime(1, noiseStartTime);
+    noiseGainNode.gain.setValueAtTime(0, gapStartTime);
+    noiseGainNode.gain.setValueAtTime(1, gapEndTime);
+  }
+
+  noiseSourceNode.start(noiseStartTime);
+  noiseSourceNode.stop(noiseEndTime);
+
+  noiseSourceNode.addEventListener("ended", () => {
+    if (playBtn)
+    {
+      playBtn.disabled = false;
+    }
+  }, { once: true });
+}
+
 
 // ---------- Frequency Test Code ----------
 
@@ -97,7 +203,9 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
  * - UI has one slider, Play/Stop (placeholders), and a single "Mark Highest Audible" button
  * - Results screen replaces the test UI after marking
  ***********************/
-
+let pinpointing_exact_frequency = false; // When the user has clicked "No, I can't Hear it" let the user pinpoint their best audible with smaller steps.
+let pinpointing_max = 20000;
+let pinpointing_min = 2000;
 (async function () {
   // --- Local state
   let ctx = await getAudioContext();
@@ -122,6 +230,11 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
     if (el) el.textContent = text;
   }
 
+  function setFreqStatus2(text) {
+    const el = $("freq-status2");
+    if (el) el.textContent = text;
+  }
+
   // --- Public entry from the new button in mode-select
   window.startFreqTest = function startFreqTest() {
     // Hide other test areas to avoid overlap
@@ -137,12 +250,19 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
     freqCurrentHz = 2000;
     freqHighestHz = null;
     freqPlaying = false;
+    pinpointing_exact_frequency = false;
+    pinpointing_max = 20000;
+    pinpointing_min = 2000;
 
     // Reset UI
     if ($("freq-slider")) $("freq-slider").value = "2000";
     if ($("freq-readout")) $("freq-readout").textContent = "2 kHz";
     if ($("next_suggested_frequency")) $("next_suggested_frequency").textContent = `Next Suggested Frequency Check: 3,000 Hz or 3 kHz`;
     setFreqStatus("Ready");
+    setFreqStatus2("Ready");
+    if ($("freq-slider")) $("freq-slider").min = 2000;
+    if ($("freq-slider")) $("freq-slider").max = 20000;
+    if ($("freq-slider")) $("freq-slider").step = 1000;
 
     // Show our area
     safeShow("freq-test-area");
@@ -150,9 +270,13 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
   };
 
   // --- UI handlers (wired via inline onclick/oninput in HTML)
+
+  let freqStopTimer;  // This is the timer variable to stop the frequency sound after a certain duration.
+  let FREQ_STOP_TIMER_RESET_TIME = 5000; // Milliseconds; This is the time that will be used for when it's time for the FreqStopTimer to stop.
   window.updateFreqReadout = function updateFreqReadout() {
     const v = Number(($("freq-slider") || {}).value || 1000);
     freqCurrentHz = Math.round(v);
+    
     if ($("freq-readout")) $("freq-readout").textContent = freqFmtHz(freqCurrentHz);
 
     if (freqPlaying) {                                        // Only adjust the frequency if the tone is currently playing
@@ -161,59 +285,235 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
     }
     
     let nextSuggestedFreq; // variable for the next suggested frequency for the user to check
+    if(freqCurrentHz < 20000){
+      if(freqCurrentHz < 6000){     // the range for hearing loss is 2000-6000 hz, but it can get murky in the 7-8 kHz range. To be safe, start slowing down the increments from 1000 to 500 around this mark.
 
-    if(freqCurrentHz < 6000){     // the range for hearing loss is 2000-6000 hz, but it can get murky in the 7-8 kHz range. To be safe, start slowing down the increments from 1000 to 500 around this mark.
+        nextSuggestedFreq = freqCurrentHz + 1000; // recommend the user jumps 1000 hz
+        document.getElementById("freq-slider").step = 1000;
+      }
+      else{
 
-      nextSuggestedFreq = freqCurrentHz + 1000; // recommend the user jumps 1000 hz
-      document.getElementById("freq-slider").step = 1000;
+        nextSuggestedFreq = freqCurrentHz + 500; // recommend the user jumps 500 hz
+        document.getElementById("freq-slider").step = 500;
+      }
+
+      if ($("next_suggested_frequency")) $("next_suggested_frequency").textContent = `Next Suggested Frequency Check: ${nextSuggestedFreq} Hz or ${freqFmtHz(nextSuggestedFreq)}`;
     }
-    else{
 
-      nextSuggestedFreq = freqCurrentHz + 500; // recommend the user jumps 500 hz
-      document.getElementById("freq-slider").step = 500;
-    }
+  };
 
-    if ($("next_suggested_frequency")) $("next_suggested_frequency").textContent = `Next Suggested Frequency Check: ${nextSuggestedFreq} Hz or ${freqFmtHz(nextSuggestedFreq)}`;
+  window.updateFreqReadout2 = function updateFreqReadout2() { // this is a copy of the updateFreqReadout function above, except this version works for the pinpoint_exact_frequency sections. This is for after the user has selected "No, I can't Hear it".
+    const v = Number(($("freq-slider2") || {}).value || 1000);
+    freqCurrentHz = Math.round(v);
     
+    if ($("freq-readout2")) $("freq-readout2").textContent = freqFmtHz(freqCurrentHz);
+
+    if (freqPlaying) {                                        // Only adjust the frequency if the tone is currently playing
+      oscNode.frequency.value = freqCurrentHz;                // Adjust the frequency value of the OscillatorNode based on user input (applies immediately)
+      setFreqStatus2(`Playing ${freqFmtHz(freqCurrentHz)}`);   // Update the status message
+    }
+    
+    let nextSuggestedFreq; // variable for the next suggested frequency for the user to check
+    
+    if(freqCurrentHz < pinpointing_max){
+
+      nextSuggestedFreq = freqCurrentHz + 100; // recommend the user jumps 1000 hz
+      document.getElementById("freq-slider2").step = 100;
+      if ($("next_suggested_frequency2")) $("next_suggested_frequency2").textContent = `Next Suggested Frequency Check: ${nextSuggestedFreq} Hz or ${freqFmtHz(nextSuggestedFreq)}`;
+    }
 
   };
 
   window.prepareFreqTestForNextFreq = function prepareFreqTestForNextFreq(){ //automatically set the value of the input to be the next suggested freq
-
+    // backend functionality for the "Yes I can still hear it" button.
     let freqInput = document.getElementById("freq-slider");
+    let freqInput2 = document.getElementById("freq-slider2");
+    
+    if(!pinpointing_exact_frequency && parseInt(freqInput.value, 10) < 20000){
+      if(parseInt(freqInput.value, 10) < 6000){     // the range for hearing loss is 2000-6000 hz, but it can get murky in the 7-8 kHz range. To be safe, start slowing down the increments from 1000 to 500 around this mark.
+
+        temp = parseInt(freqInput.value, 10);
+        freqInput.value = temp + 1000;
+        
+      }
+      else{
+
+        temp = parseInt(freqInput.value, 10);
+        freqInput.value = temp + 500;
+        
+      }
+    }
+    else if(pinpointing_exact_frequency && parseInt(freqInput2.value, 10) < pinpointing_max){
+
+      temp = parseInt(freqInput2.value, 10);   // if pinpointing frequency, aka "No, I can't hear it" was pressed, use lower step size.
+      freqInput2.value = temp + 100;
+    }
     
 
-    if(freqInput.value < 6000){     // the range for hearing loss is 2000-6000 hz, but it can get murky in the 7-8 kHz range. To be safe, start slowing down the increments from 1000 to 500 around this mark.
+    if(freqStopTimer != null){
 
-      temp = parseInt(freqInput.value, 10);
-      freqInput.value = temp + 1000;
+      clearTimeout(freqStopTimer);
+      freqStopTimer = setTimeout(freqStopPlaceholder, FREQ_STOP_TIMER_RESET_TIME); // stop after 5 seconds
+    }
+
+    if(!pinpointing_exact_frequency){
+      updateFreqReadout();
+    }
+    else{
+      updateFreqReadout2();
+    }
+  };
+
+  window.eventListenerForFreqIncBtn = function eventListenerForFreqIncBtn(){
+
+      let freqInput = document.getElementById("freq-slider");
+      let freqInput2 = document.getElementById("freq-slider2");
+
+      if(parseInt(freqInput.value, 10) < 20000){
+        if(!pinpointing_exact_frequency){
+          if(freqInput.value < 6000){     // the range for hearing loss is 2000-6000 hz, but it can get murky in the 7-8 kHz range. To be safe, start slowing down the increments from 1000 to 500 around this mark.
+
+            temp = parseInt(freqInput.value, 10);
+            freqInput.value = temp + 1000;
+          
+          }
+          else{
+
+            temp = parseInt(freqInput.value, 10);
+            freqInput.value = temp + 500;
+            
+          }
+          updateFreqReadout();
+        }
+        else if(pinpointing_exact_frequency && parseInt(freqInput2.value, 10) < pinpointing_max){
+
+          temp = parseInt(freqInput2.value, 10);   // If "No, I can't hear it" was pressed and current value is below the new max
+          freqInput2.value = temp + 100;
+          updateFreqReadout2();
+        }
+        
+
+        if(freqStopTimer != null){
+
+          clearTimeout(freqStopTimer);
+          freqStopTimer = setTimeout(freqStopPlaceholder, FREQ_STOP_TIMER_RESET_TIME); // stop after 5 seconds
+        }
+      }
+
+    
+
+  };
+
+  window.eventListenerForFreqDecBtn = function eventListenerForFreqDecBtn(){
+
+      let freqInput = document.getElementById("freq-slider");
+      let freqInput2 = document.getElementById("freq-slider2");
+
+      if(parseInt(freqInput.value, 10) > 2000){
+        if(!pinpointing_exact_frequency){
+          if(freqInput.value <= 6000){     // the range for hearing loss is 2000-6000 hz, but it can get murky in the 7-8 kHz range. To be safe, start slowing down the increments from 1000 to 500 around this mark.
+
+            temp = parseInt(freqInput.value, 10);
+            freqInput.value = temp - 1000;
+          
+          }
+          else{
+
+            temp = parseInt(freqInput.value, 10);
+            freqInput.value = temp - 500;
+            
+          }
+          updateFreqReadout();
+        }
+        else if(pinpointing_exact_frequency && parseInt(freqInput2.value, 10) > pinpointing_min){
+          temp = parseInt(freqInput2.value, 10);
+          freqInput2.value = temp - 100;
+          updateFreqReadout2();
+        }
+          
+
+          if(freqStopTimer != null){
+
+            clearTimeout(freqStopTimer);
+            freqStopTimer = setTimeout(freqStopPlaceholder, FREQ_STOP_TIMER_RESET_TIME); // stop after 5 seconds
+          }
+      }
+
+  };
+
+  window.pinpointingExactFrequencyPage = function pinpointingExactFrequencyPage(){ // pinpoint a better approximation for where the user stopped hearing the tone.
+    if(freqPlaying){
+      window.freqStopPlaceholder();
+    }
+    pinpointing_exact_frequency = true; // let the program know we have switched modes
+    freq_slider = document.getElementById("freq-slider");
+    freq_slider2 = document.getElementById("freq-slider2");
+    setFreqStatus2("Ready");
+    
+    pinpointing_max = parseInt(freq_slider.value, 10); // this is where the user clicked "No, I can't hear." Therefore, we don't need to go past this point.
+    
+
+    if(pinpointing_max > 2000){
+      if(pinpointing_max <= 6000 && pinpointing_max >= 4000){ // since 2-6 kHz is where we are normally stepping by 1000, set the target range for pinpoint to be 2x this less than the max.
+
+        pinpointing_min = pinpointing_max - 2000;
+      }
+      else if(pinpointing_max < 4000){ // if less than 4000, we want the minimum to be 2000.
+
+        pinpointing_min = 2000;
+      }
+      else{
+
+        pinpointing_min = pinpointing_max - 1000;
+      }
+
+      safeHide("freq-test-area"); // hide the previous page
+      safeShow("pinpoint_highest_audible_for_freq_test"); // show new page
       
+      if ($("freq-slider2")) $("freq-slider2").value = pinpointing_min;
+      freq_slider.value = parseInt(freq_slider2.value, 10);
+      if ($("freq-slider2")) $("freq-slider2").min = pinpointing_min;
+      if ($("freq-slider2")) $("freq-slider2").max = pinpointing_max;
+      if ($("freq-slider2")) $("freq-slider2").step = 100;
+      if ($("freq-readout2")) $("freq-readout2").textContent = `${pinpointing_min / 1000} kHz`;
+      
+      instructions = document.getElementById("pinpoint_highest_audible_for_freq_test_instructions");
+      instructions.textContent = `Looks like you stopped hearing the sound around ${pinpointing_max} Hz or ${freqFmtHz(pinpointing_max)}. Let's narrow down a better approximation for what you can hear. Try again, but this time your test range will be between ${pinpointing_min} Hz or ${freqFmtHz(pinpointing_min)} and ${pinpointing_max} Hz or ${freqFmtHz(pinpointing_max)}.`;
+      if ($("next_suggested_frequency2")) $("next_suggested_frequency2").textContent = `Next Suggested Frequency Check: ${pinpointing_min + 100} Hz or ${freqFmtHz(pinpointing_min + 100)}`;
+
+      freqCurrentHz = parseInt(freq_slider2.value, 10);
+    }
+    else{ // if 2000, there's nothing to check. Head straight to results.
+      markHighestFrequency();
+    }
+  };
+
+  window.prepareForMarkHighestFrequency = function prepareForMarkHighestFrequency(){ //this function checks if the user is at least able to hear the pinpointing_min value. If they can, go ahead and proceed to the markHighestFrequency(). If not, recursively call pinpointExactFrequencyPage();
+
+    if(freqCurrentHz == pinpointing_min){
+
+      window.pinpointingExactFrequencyPage();
     }
     else{
 
-      temp = parseInt(freqInput.value, 10);
-      freqInput.value = temp + 500;
-      
+      markHighestFrequency();
     }
-
-    updateFreqReadout();
+    
   };
-
-  let freqStopTimer;  // This is the timer variable to stop the frequency sound after a certain duration.
-
+  
   window.freqPlayPlaceholder = function freqPlayPlaceholder() {
     if (!freqPlaying) {                                                // Only start the tone if it's not already playing
       oscNode = getOscillatorNodeWithGain(ctx, freqCurrentHz, 0.25);   // Create the OscillatorNode to play the tone (at the freqency determined by the input slider)
       oscNode.start();                                                 // Play the tone
       freqPlaying = true;
       setFreqStatus(`Playing ${freqFmtHz(freqCurrentHz)}`);
-
+      setFreqStatus2(`Playing ${freqFmtHz(freqCurrentHz)}`);
       if(freqStopTimer != null){  // make sure the timer variable has a reference
         clearTimeout(freqStopTimer);  // reset timer variable timer
       }
       if(freqPlaying){  // don't worry about this if the user stopped the sound before this point
 
-        freqStopTimer = setTimeout(freqStopPlaceholder, 3000); // stop after 3 seconds
+        freqStopTimer = setTimeout(freqStopPlaceholder, FREQ_STOP_TIMER_RESET_TIME); // stop after 5 seconds
       }
       
       
@@ -224,10 +524,15 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
     oscNode.stop()                                                    // Stop playing the tone
     freqPlaying = false;
     setFreqStatus("Stopped");
+    setFreqStatus2("Stopped");
   };
 
   window.markHighestFrequency = function markHighestFrequency() {
     freqHighestHz = freqCurrentHz;
+
+    if(freqHighestHz > pinpointing_min){
+      freqHighestHz = freqHighestHz - 100;
+    }
 
     // Stop placeholder "audio" and show results
     window.freqStopPlaceholder();
@@ -239,6 +544,7 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
 
     // Replace the testing UI with the results area
     safeHide("freq-test-area");
+    safeHide("pinpoint_highest_audible_for_freq_test");
     safeShow("freq-results-area");
   };
 
@@ -250,8 +556,10 @@ const INIT_FREQ = 1000;         // Specifies the initial position of the input s
   window.backToModesFromFreq = function backToModesFromFreq() {
     oscNode.stop();
     freqPlaying = false;
+    pinpointing_exact_frequency = false;
     safeHide("freq-test-area");
     safeHide("freq-results-area");
+    safeHide("pinpoint_highest_audible_for_freq_test");
     safeShow("mode-select");
   };
 
@@ -485,7 +793,7 @@ async function playTriplet(triplet, gainAmount)
 
   // Create the AudioBuffer for the background noise, which can be reused throughout the entire test
   if (!noiseAudioBuffer) noiseAudioBuffer = await getAudioBufferFromUrl(ctx, DIN_TEST_NOISE_PATH);
-  let noiseSourceNode = getSourceNodeWithGain(ctx, noiseAudioBuffer, gainAmount);   // Create SourceNode to allow for noise playback
+  let noiseSourceNode = getSourceNodeWithGain(ctx, noiseAudioBuffer, gainAmount)[0];   // Create SourceNode to allow for noise playback
 
   let digitsAudioBuffer = await getAudioBufferFromUrl(ctx, `${DIN_TEST_TRIPLETS_PATH}${triplet}.wav`);   // Create AudioBuffer for triplet audio
   let digitsSourceNode = getSourceNode(ctx, digitsAudioBuffer);                                          // Create SourceNode to allow for digits playback
