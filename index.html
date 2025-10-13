@@ -28,6 +28,7 @@
        <button onclick="startDbHlTest()">dB HL Testing</button>
        <button onclick="DinCalibrationPage()">DIN Test</button>
        <button onclick="startFreqTest()">Frequency Range (Highest Only)</button>
+       <button onclick="startTgdTest()">Temporal Gap Detection Test</button>
     </div>
     <div id="test-area" style="display: none;">
       <p><em>Click "Play", then tell us if you can hear the sound. This helps check your hearing sensitivity at different tones.</em></p>
@@ -271,11 +272,36 @@
 
    <!-- End Highest-Audible Frequency Test -->
 
+  <!-- Temporal Gap Detection Test -->
+  <div id="tgd-test-area" style="display:none;">
 
+    <label for="gap-len-input">Gap length (ms)</label>
+    <input
+      id="gap-len-input"
+      type="number"
+      min="0"
+      max="100"
+      step = "1"
+      value="0"
+    />
 
-    
-    
+    <label for="gap-pos-input">Gap position (%)</label>
+    <input
+      id="gap-pos-input"
+      type="number"
+      min="0"
+      max="100"
+      step = "1"
+      value="50"
+    />
 
+    <label for="fade-toggle-cb">Fade in/out?</label>
+    <input type="checkbox" id="fade-toggle-cb">
+
+    <button id="tgd-play-btn">Play</button>
+
+  </div>
+  <!-- End Temporal Gap Detection Test -->
 
     <!-- Results will appear here -->
     <!-- Always-visible summary -->

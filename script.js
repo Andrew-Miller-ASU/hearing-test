@@ -26,6 +26,39 @@ async function getAudioBufferFromUrl(ctx, url)
   return await ctx.decodeAudioData(arrayBuffer.slice(0));
 }
 
+// Generates white noise with the specified duration, sample rate, and cutoff frequency (using a low-pass filter)
+// Returns an AudioBuffer object
+async function getWhiteNoiseAudioBuffer(durationSec, sampleRateHz, lowPassCutoffFreqHz)
+{
+  const numSamples = Math.floor(durationSec * sampleRateHz);
+  const offlineAudioCtx = new OfflineAudioContext(1, numSamples, sampleRateHz);
+
+  const noiseBuffer = offlineAudioCtx.createBuffer(1, numSamples, sampleRateHz);
+  const channelData = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < channelData.length; i++)
+  {
+    channelData[i] = Math.random() * 2 - 1;
+  }
+
+  const noiseSource = offlineAudioCtx.createBufferSource();
+  noiseSource.buffer = noiseBuffer;
+
+  const lowPassFilter1 = offlineAudioCtx.createBiquadFilter();
+  lowPassFilter1.type = "lowpass";
+  lowPassFilter1.frequency.value = lowPassCutoffFreqHz;
+  lowPassFilter1.Q.value = Math.SQRT1_2;
+
+  const lowPassFilter2 = offlineAudioCtx.createBiquadFilter();
+  lowPassFilter2.type = "lowpass";
+  lowPassFilter2.frequency.value = lowPassCutoffFreqHz;
+  lowPassFilter2.Q.value = Math.SQRT1_2;
+
+  noiseSource.connect(lowPassFilter1).connect(lowPassFilter2).connect(offlineAudioCtx.destination);
+  noiseSource.start();
+
+  return await offlineAudioCtx.startRendering();
+}
+
 // Creates an AudioBufferSourceNode from an AudioBuffer object
 // The audio can be played by calling start() and stopped by calling stop()
 function getSourceNode(ctx, audioBuffer)
@@ -51,7 +84,7 @@ function getSourceNodeWithGain(ctx, audioBuffer, gainAmount)
   gainNode.gain.value = gainAmount;
 
   srcNode.connect(gainNode).connect(ctx.destination);
-  return srcNode;
+  return [srcNode, gainNode];
 } 
 
 // Creates an OscillatorNode, which is a type of SourceNode
@@ -84,6 +117,79 @@ function getOscillatorNodeWithGain(ctx, frequency, gainAmount)
 
   oscNode.connect(gainNode).connect(ctx.destination);
   return oscNode;
+}
+
+// ---------- Temporal Gap Detection Test Code ----------
+
+const NOISE_DURATION_SEC = 0.5;
+const NOISE_SAMPLE_RATE_HZ = 50000;
+const NOISE_CUTOFF_FREQ_HZ = 5000;
+const FADE_IN_OUT_DURATION_MS = 1;
+
+let noiseAudioBufferTgd = null;
+
+async function startTgdTest()
+{
+  document.getElementById("mode-select").style.display = "none";      // Hide the mode selection menu
+  document.getElementById("tgd-test-area").style.display = "block";   // Show the TGD testing interface
+
+  const playBtn = document.getElementById("tgd-play-btn");
+
+  // Play button event listener
+  playBtn.addEventListener("click", async () => {
+    gapLength = document.getElementById("gap-len-input").value;
+    gapPosition = document.getElementById("gap-pos-input").value;
+    fade = document.getElementById("fade-toggle-cb").checked;
+    playBtn.disabled = true;
+    await playNoise(gapLength, gapPosition, fade, playBtn);
+  });
+}
+
+async function playNoise(gapLengthMs, gapPositionPct, fade, playBtn)
+{
+  const ctx = await getAudioContext();
+
+  if (!noiseAudioBufferTgd) noiseAudioBufferTgd = await getWhiteNoiseAudioBuffer(NOISE_DURATION_SEC, NOISE_SAMPLE_RATE_HZ, NOISE_CUTOFF_FREQ_HZ);
+  
+  let [noiseSourceNode, noiseGainNode] = getSourceNodeWithGain(ctx, noiseAudioBufferTgd, 1.0);
+
+  let noiseStartTime = ctx.currentTime + 0.05;
+  let gapStartTime = noiseStartTime + (NOISE_DURATION_SEC * (gapPositionPct / 100));
+  let gapEndTime = gapStartTime + (gapLengthMs / 1000);
+  let noiseEndTime = noiseStartTime + NOISE_DURATION_SEC;
+
+  if (fade)
+  {
+    let rampLengthSec = FADE_IN_OUT_DURATION_MS / 1000;
+
+    noiseGainNode.gain.setValueAtTime(0, noiseStartTime);
+    noiseGainNode.gain.linearRampToValueAtTime(1, noiseStartTime + rampLengthSec);
+
+    noiseGainNode.gain.setValueAtTime(1, Math.max(noiseStartTime + rampLengthSec, gapStartTime - rampLengthSec));
+    noiseGainNode.gain.linearRampToValueAtTime(0, gapStartTime);
+
+    noiseGainNode.gain.setValueAtTime(0, gapEndTime);
+    noiseGainNode.gain.linearRampToValueAtTime(1, gapEndTime + rampLengthSec);
+
+    noiseGainNode.gain.setValueAtTime(1, Math.max(0, noiseEndTime - rampLengthSec));
+    noiseGainNode.gain.linearRampToValueAtTime(0, noiseEndTime);
+  }
+  else
+  {
+    noiseGainNode.gain.setValueAtTime(1, noiseStartTime);
+    noiseGainNode.gain.setValueAtTime(0, gapStartTime);
+    noiseGainNode.gain.setValueAtTime(1, gapEndTime);
+  }
+
+  noiseSourceNode.start(noiseStartTime);
+  noiseSourceNode.stop(noiseEndTime);
+
+  noiseSourceNode.addEventListener("ended", () => {
+    if (playBtn)
+    {
+      playBtn.disabled = false;
+    }
+  }, { once: true });
 }
 
 
@@ -687,7 +793,7 @@ async function playTriplet(triplet, gainAmount)
 
   // Create the AudioBuffer for the background noise, which can be reused throughout the entire test
   if (!noiseAudioBuffer) noiseAudioBuffer = await getAudioBufferFromUrl(ctx, DIN_TEST_NOISE_PATH);
-  let noiseSourceNode = getSourceNodeWithGain(ctx, noiseAudioBuffer, gainAmount);   // Create SourceNode to allow for noise playback
+  let noiseSourceNode = getSourceNodeWithGain(ctx, noiseAudioBuffer, gainAmount)[0];   // Create SourceNode to allow for noise playback
 
   let digitsAudioBuffer = await getAudioBufferFromUrl(ctx, `${DIN_TEST_TRIPLETS_PATH}${triplet}.wav`);   // Create AudioBuffer for triplet audio
   let digitsSourceNode = getSourceNode(ctx, digitsAudioBuffer);                                          // Create SourceNode to allow for digits playback
