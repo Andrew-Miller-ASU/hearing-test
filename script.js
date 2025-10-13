@@ -501,6 +501,184 @@ async function playTriplet(triplet, gainAmount)
   return {triplet, gainAmount}    // Return the triplet that was played and the volume level
 }
 
+// -------- End of the DIN test code ------------
+
+
+// Temporal Gap test code (placeholder only - no functionality yet) ----------------
+// ===== Temporal Gap Detection (2AFC) — Frontend-only =====
+
+// ===== Temporal Gap Detection (Design-only; no audio) =====
+function tg$(id){ return document.getElementById(id); }
+function tgShow(id){ const el=tg$(id); if (el) el.style.display='block'; }
+function tgHide(id){ const el=tg$(id); if (el) el.style.display='none'; }
+
+const tgDesignCFG = {
+  totalTrials: 12 // UI preview count; adjust as you like
+};
+
+let tgDesignState = null;
+
+function tgResetDesign(){
+  tgDesignState = {
+    running: false,
+    trial: 0,
+    awaiting: false,
+    logs: []
+  };
+  tg$("tg-status").textContent = "Ready";
+  tg$("tg-progress").textContent = `Trial 0 / ${tgDesignCFG.totalTrials}`;
+  tg$("tg-progress-bar").style.width = "0%";
+  tg$("tg-first-btn").disabled  = true;
+  tg$("tg-second-btn").disabled = true;
+
+  //  reset Start label + disable Replay
+  const startBtn = tg$("tg-start-btn");
+  if (startBtn) startBtn.textContent = "Start Test";
+  const replayBtn = tg$("tg-replay-btn");
+  if (replayBtn) replayBtn.disabled = true;
+
+  tgHide("tg-results");
+}
+
+// Show TG page from Mode Select
+window.startTemporalGapTest = function startTemporalGapTest(){
+  // Hide other areas you already have
+  tgHide("mode-select");
+  tgHide("test-area");
+  tgHide("dbhl-test-area");
+  tgHide("din-test-area");
+  tgHide("freq-test-area");
+  tgHide("freq-results-area");
+  tgHide("summary-section");
+  tgHide("results-detail");
+
+  tgShow("tg-test-area");
+  tgResetDesign();
+};
+
+// Back to mode menu
+window.backToModesFromTG = function backToModesFromTG(){
+  tgHide("tg-test-area");
+  tgShow("mode-select");
+};
+
+// Begin (design-only): fake the “listening choose” flow without audio
+window.tgBeginDesign = function tgBeginDesign(){
+  // Restart from scratch each time
+  tgResetDesign();
+
+  // Change label after first click
+  const startBtn = tg$("tg-start-btn");
+  if (startBtn) startBtn.textContent = "Restart Test";
+
+  tgDesignState.running = true;
+  tg$("tg-status").textContent = "Listening… ( preview)";
+  tg$("tg-first-btn").disabled  = true;
+  tg$("tg-second-btn").disabled = true;
+
+  // Simulate both intervals finishing, then enable choices + replay
+  setTimeout(() => {
+    if (!tgDesignState.running) return;
+    tg$("tg-status").textContent = "Which had the pause?";
+    tg$("tg-first-btn").disabled  = false;
+    tg$("tg-second-btn").disabled = false;
+
+    // NEW: allow replay of the current trial
+    const replayBtn = tg$("tg-replay-btn");
+    if (replayBtn) replayBtn.disabled = false;
+
+    tgDesignState.awaiting = true;
+  }, 900);
+};
+
+window.tgReplayDesign = function tgReplayDesign(){
+  if (!tgDesignState?.running) return;
+
+  // Disable choices during replay
+  tgDesignState.awaiting = false;
+  tg$("tg-first-btn").disabled  = true;
+  tg$("tg-second-btn").disabled = true;
+
+  const replayBtn = tg$("tg-replay-btn");
+  if (replayBtn) replayBtn.disabled = true;
+
+  tg$("tg-status").textContent = "Replaying… (design preview)";
+
+  setTimeout(() => {
+    if (!tgDesignState.running) return;
+    tg$("tg-status").textContent = "Which had the pause?";
+    tg$("tg-first-btn").disabled  = false;
+    tg$("tg-second-btn").disabled = false;
+
+    if (replayBtn) replayBtn.disabled = false;
+    tgDesignState.awaiting = true;
+  }, 700);
+};
+
+
+// Handle a choice (design-only): just advance UI
+window.tgChoose = function tgChoose(choice){
+  if (!tgDesignState?.running || !tgDesignState.awaiting) return;
+
+  // Disable choices & replay while we transition
+  tg$("tg-first-btn").disabled  = true;
+  tg$("tg-second-btn").disabled = true;
+  const replayBtn = tg$("tg-replay-btn");
+  if (replayBtn) replayBtn.disabled = true;
+
+  // Log minimal info (no correctness; no audio yet)
+  tgDesignState.logs.push({ trial: tgDesignState.trial + 1, response: choice });
+
+  // Advance trial count & progress
+  tgDesignState.trial += 1;
+  const t = tgDesignState.trial;
+  const total = tgDesignCFG.totalTrials;
+
+  tg$("tg-progress").textContent = `Trial ${t} / ${total}`;
+  tg$("tg-progress-bar").style.width = Math.min(100, Math.round((t/total)*100)) + "%";
+
+  if (t >= total){
+    tgDesignState.running = false;
+    tg$("tg-status").textContent = "Done (design preview)";
+    tg$("tg-result-summary").textContent =
+      "Placeholder result. Threshold estimation will appear here once audio is implemented.";
+
+    // Keep replay disabled at the end
+    if (replayBtn) replayBtn.disabled = true;
+
+    tgShow("tg-results");
+    return;
+  }
+
+  // Simulate next trial
+  tg$("tg-status").textContent = "Listening… (design preview)";
+  tgDesignState.awaiting = false;
+
+  setTimeout(() => {
+    if (!tgDesignState.running) return;
+    tg$("tg-status").textContent = "Which had the pause?";
+    tg$("tg-first-btn").disabled  = false;
+    tg$("tg-second-btn").disabled = false;
+
+    // Re-enable replay once awaiting a response
+    if (replayBtn) replayBtn.disabled = false;
+
+    tgDesignState.awaiting = true;
+  }, 600);
+};
+
+
+// Keyboard shortcuts for accessibility (design-only)
+window.addEventListener("keydown", (e) => {
+  if (!tgDesignState?.running || !tgDesignState.awaiting) return;
+  if (e.key === "1") tgChoose(1);
+  if (e.key === "2") tgChoose(2);
+});
+
+
+// -------- End of Temporal Gap test code ------------
+
+
 
 // ---------- dB HL Testing Code ----------
 
