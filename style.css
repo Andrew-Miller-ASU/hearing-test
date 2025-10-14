@@ -244,3 +244,8 @@ summary h3 {
   .tg-grid { grid-template-columns: 1fr; }
   .tg-audio-visual { width: 100%; max-width: 420px; }
 }
+
+.tg-audio-visual {
+  position: relative;   /* needed for the inside progress bar */
+  overflow: hidden;     /* keeps the bar inside rounded corners */
+}

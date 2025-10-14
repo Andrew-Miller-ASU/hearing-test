@@ -276,8 +276,11 @@
    
     <div id="tg-test-area" style="display:none;">
       <p style="margin-bottom:12px; text-align:left;">
-        You’ll hear two short “whooshes.” One has a tiny pause. Choose the one with the pause.
-        <br><span style="color:#64748b;">(Design preview — audio not implemented yet.)</span>
+        Use headphones in a quiet room. Click <strong>Start</strong> to hear two short “whooshes.” 
+        One has a tiny silent pause in the middle. After both sounds, choose 
+        <strong>First</strong> or <strong>Second</strong> (or press <strong>1</strong>/<strong>2</strong>) for the one with the pause. 
+        You can click <strong>Replay current trial</strong> to hear the same pair again. 
+        This is a screening tool; results may vary by device and room noise.
       </p>
 
       <div id="tg-status" style="margin:8px 0; font-weight:600; text-align:center;">Ready</div>
@@ -288,10 +291,9 @@
 
       <!-- START above the audios -->
      <div class="tg-top-controls">
-        <button id="tg-start-btn" onclick="tgBeginDesign()"> Start Test</button>
-        <button id="tg-replay-btn" onclick="tgReplayDesign()" disabled>Replay current trial</button>
-     </div>
-
+        <button id="tg-start-btn"  onclick="tgBegin()">Start Test</button>
+        <button id="tg-replay-btn" onclick="tgReplay()" disabled>Replay current trial</button>
+      </div>
             <!-- Two “audio” panels left/right -->
       <div class="tg-grid">
         <div class="tg-audio">
