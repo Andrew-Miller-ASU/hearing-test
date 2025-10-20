@@ -708,8 +708,6 @@ async function playTriplet(triplet, gainAmount)
 
 // ===== Temporal Gap Detection  =====
 
-// ===== Temporal Gap Detection  =====
-
 function tg$(id){ return document.getElementById(id); }
 function tgShow(id){ const el=tg$(id); if (el) el.style.display='block'; }
 function tgHide(id){ const el=tg$(id); if (el) el.style.display='none'; }
@@ -739,9 +737,18 @@ window.backToModesFromTG = function backToModesFromTG(){
 const TGD_NOISE_SEC = 0.5;   // duration of each interval (A or B)
 const TGD_ISI_SEC   = 0.5;   // gap between A and B
 const TGD_FADE_MS   = 1;     // ramp edges (ms)
-const TGD_GAP_MS    = 25;    // default internal silent gap length (ms)
 const TGD_GAP_POS   = 50;    // where the gap sits inside the interval (%)
 const TGD_USE_FADES = true;
+// ---------- Adaptive gap  ----------
+let TGD_GAP_MS = 25;          // start gap 
+const TGD_GAP_MIN = 1;
+const TGD_GAP_MAX = 200;
+const TGD_STEP_DOWN = 0.80;   // 20% smaller after two correct
+const TGD_STEP_UP   = 1.25;   // 25% larger after one wrong
+let tgConsecCorrect = 0;      // consecutive correct counter
+let tgLastDir = null;         // 'up' | 'down' | null
+let tgReversalGaps = [];      // store gaps at reversals for threshold estimate
+
 
 let __tgctx = null;
 let __noiseBuf = null;
@@ -754,7 +761,7 @@ async function tgGetAudioContext(){
   return __tgctx;
 }
 
-// If app already exposes getAudioContext(), reuse it
+
 async function _getCtx(){
   if (typeof getAudioContext === "function") return await getAudioContext();
   return await tgGetAudioContext();
@@ -772,12 +779,12 @@ async function tgGetNoiseBuffer(durationSec){
   return buf;
 }
 
-// Play ONE interval with an optional internal silent gap
+// Play one interval with an optional internal silent gap
 async function tgdPlayNoiseInterval(gapMs, gapPosPct, fade, startAt){
   const ctx = await _getCtx();
   const buf = await tgGetNoiseBuffer(TGD_NOISE_SEC);
 
-  // (avoid helper collision) — create nodes inline
+
   const src  = ctx.createBufferSource();
   src.buffer = buf;
   const gain = ctx.createGain();
@@ -815,7 +822,7 @@ async function tgdPlayNoiseInterval(gapMs, gapPosPct, fade, startAt){
   return { start: t0, stop: t1 };
 }
 
-// Play A and B; optionally force which side has the gap (used by Replay)
+// Play A and B optionally force which side has the gap used by Replay
 async function tgdPlayTwoIntervals(gapMs, gapPosPct, fade, forcedGapInFirst = null){
   const ctx = await _getCtx();
   const t0 = ctx.currentTime + 0.2;
@@ -836,7 +843,7 @@ async function tgdPlayTwoIntervals(gapMs, gapPosPct, fade, forcedGapInFirst = nu
 }
 
 // ---------- UI state, progress, and inline audio lines ----------
-const tgCFG = { totalTrials: 12 };
+const tgCFG = { totalTrials: 24 };
 let tgState = null;
 let tgAudioState = null;   // {gapInFirst}
 let tgTimers = [];         // timeouts to clear on reset
@@ -857,8 +864,6 @@ function ensureAudioLines(){
   const oldB = document.getElementById("tg-line-b-track");
   if (oldA) oldA.remove();
   if (oldB) oldB.remove();
-
-  // tiles INSIDE each panel (A then B)
   const tiles = Array.from(document.querySelectorAll(".tg-audio .tg-audio-visual"));
   const aTile = tiles[0];
   const bTile = tiles[1];
@@ -931,6 +936,13 @@ function tgReset(){
   clearTimers();
   ensureAudioLines();
 
+    // reset staircase
+  TGD_GAP_MS = 25;
+  tgConsecCorrect = 0;
+  tgLastDir = null;
+  tgReversalGaps = [];
+
+
   tgState = { running:false, trial:0, awaiting:false, logs:[] };
   tgAudioState = null;
 
@@ -957,7 +969,7 @@ window.tgBegin = async function tgBegin(){
   await tgRunOneAB(false);
 };
 
-// Replay same assignment (doesn’t advance trial)
+// Replay same assignment doesn’t advance trial
 window.tgReplay = async function tgReplay(){
   if (!tgState?.running || !tgAudioState) return;
   tg$("tg-first-btn").disabled  = true;
@@ -973,7 +985,7 @@ async function tgRunOneAB(useLast=false){
   tg$("tg-status").textContent = "Listening…";
   tgState.awaiting = false;
 
-  // decide side (and keep it for replay)
+  // decide side and keep it for replay
   const forcedGapInFirst = useLast && tgAudioState ? tgAudioState.gapInFirst : null;
 
   const res = await tgdPlayTwoIntervals(TGD_GAP_MS, TGD_GAP_POS, TGD_USE_FADES, forcedGapInFirst);
@@ -986,30 +998,75 @@ async function tgRunOneAB(useLast=false){
   tgState.awaiting = true;
 }
 
-// Handle First/Second
+
 window.tgChoose = function tgChoose(choice){
   if (!tgState?.running || !tgState.awaiting) return;
 
+  // lock inputs during transition
   tg$("tg-first-btn").disabled  = true;
   tg$("tg-second-btn").disabled = true;
   tg$("tg-replay-btn").disabled = true;
+  tgState.awaiting = false;
 
-  tgState.logs.push({ trial: tgState.trial + 1, response: choice });
+  // did user pick the side with the gap?
+  // gap was on FIRST if tgAudioState.gapInFirst === true
+  const correct = (choice === (tgAudioState?.gapInFirst ? 1 : 2));
 
+  // log the trial
+  tgState.logs.push({
+    trial: tgState.trial + 1,
+    response: choice,
+    correct,
+    gapMs: Number(TGD_GAP_MS.toFixed(2))
+  });
+
+  // ----- staircase -----
+  let dir = null;
+  if (correct){
+    tgConsecCorrect += 1;
+    if (tgConsecCorrect >= 2){
+      dir = "down";
+      TGD_GAP_MS = Math.max(TGD_GAP_MIN, TGD_GAP_MS * TGD_STEP_DOWN);
+      tgConsecCorrect = 0;
+    }
+  } else {
+    dir = "up";
+    TGD_GAP_MS = Math.min(TGD_GAP_MAX, TGD_GAP_MS * TGD_STEP_UP);
+    tgConsecCorrect = 0;
+  }
+  // reversal detection 
+  if (dir && tgLastDir && dir !== tgLastDir){
+    tgReversalGaps.push(Number(TGD_GAP_MS.toFixed(2)));
+  }
+  tgLastDir = dir;
+  // -----------------------------------
+
+  // progress UI
   tgState.trial += 1;
   const t = tgState.trial, total = tgCFG.totalTrials;
   tg$("tg-progress").textContent = `Trial ${t} / ${total}`;
   tg$("tg-progress-bar").style.width = Math.min(100, Math.round((t/total)*100)) + "%";
+  tg$("tg-status").textContent = `Next gap: ${TGD_GAP_MS.toFixed(1)} ms`;
 
+  // end or continue
   if (t >= total){
     tgState.running = false;
+
+    // simple threshold estimate: mean of last 3–4 reversals if available
+    let estimate = TGD_GAP_MS;
+    if (tgReversalGaps.length >= 3){
+      const tail = tgReversalGaps.slice(-4);
+      estimate = tail.reduce((a,b)=>a+b,0) / tail.length;
+    }
+
     tg$("tg-status").textContent = "Done";
     tg$("tg-result-summary").textContent =
-      `Audio played each trial with a centered gap (~${TGD_GAP_MS} ms) on a random side.`;
+      `Estimated temporal resolution ≈ ${estimate.toFixed(1)} ms (lower is better).`;
     tgShow("tg-results");
     return;
   }
 
+  // next A/B 
   setTimeout(() => { tgRunOneAB(false); }, 450);
 };
 
