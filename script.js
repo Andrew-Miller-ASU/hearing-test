@@ -415,7 +415,7 @@ let pinpointing_min = 2000;
   };
 
   window.freqStopPlaceholder = function freqStopPlaceholder() {
-    oscNode.stop()                                                    // Stop playing the tone
+    try { oscNode.stop() } catch {};                                                   // Stop playing the tone
     freqPlaying = false;
     setFreqStatus("Stopped");
     setFreqStatus2("Stopped");
@@ -448,7 +448,7 @@ let pinpointing_min = 2000;
   };
 
   window.backToModesFromFreq = function backToModesFromFreq() {
-    oscNode.stop();
+    try { oscNode.stop() } catch {};
     freqPlaying = false;
     pinpointing_exact_frequency = false;
     safeHide("freq-test-area");
@@ -460,20 +460,20 @@ let pinpointing_min = 2000;
   // Automatically stop the tone playback if the user leaves the test
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
-      oscNode.stop();
+      try { oscNode.stop() } catch {};
       freqPlaying = false;
     }
   });
   window.addEventListener("load", () => { 
-    oscNode.stop();
+    try { oscNode.stop() } catch {};
     freqPlaying = false;
   });
   window.addEventListener("beforeunload", () => { 
-    oscNode.stop();
+    try { oscNode.stop() } catch {};
     freqPlaying = false;
   });
     window.addEventListener("pagehide", () => { 
-    oscNode.stop();
+    try { oscNode.stop() } catch {};
     freqPlaying = false;
   });
 
@@ -1031,82 +1031,152 @@ window.addEventListener("keydown", (e) => {
 
 // ---------- dB HL Testing Code ----------
 
-// Calibration constant (RETSPL value) mapping SPL to HL for a specific piece of hearing equipment (which SPL equals 0 HL)
-// Can be roughly approximated by obtaining ISO RETSPL for similar equipment
-const CAL_RETSPL_1K = 7.5;
+const DBHL_FREQ_HZ = 1000;            // The frequency of the dB HL test tone (in Hz)
+const DBHL_TONE_DURATION_SEC = 1.0;   // The duration of each tone tone during the test
+const DB_SPL_TEST_START = 0;          // The initial volume (dB SPL) of the dB HL test tone
+const DB_SPL_TEST_STEP = 2.5;         // The size of the increment in volume if the user cannot hear the current tone
 
-// Calibration constant for the user's entire equipment setup
-// Represents actual volume (dB SPL) output on the user's end when A=1.0 (0 dBFS)
-// Can possibly be roughly measured with smartphone app
-const CAL_SPL0_1K   = 96.0;
+const CAL_TONE_GAIN = 0.1;        // The amount of linear gain that will be applied to the test tone played during calibration
 
-// Final (complete) calibration constant
-// Maps A=1.0 (0 dBFS) tone in the software to a dB HL value
-const K_1K = CAL_SPL0_1K - CAL_RETSPL_1K;
+const DEFAULT_CAL_CONST =  100;   // Default constant to be used if the user opts not to calibrate their test
 
-// Tone duration
-const DBHL_DURATION_SEC = 1.0;
+// RETSPL values at 1 KHz for different types of listening devices; used for the calculation of dB HL
+const RETSPL_1KHZ_EARPHONES = 2;
+const RETSPL_1KHZ_OVEREAR = 4;
+const RETSPL_1KHZ_ONEAR = 7.5;
 
-function dbfsToAmp(dbfs) {
-  const amp = Math.pow(10, dbfs / 20);
-  return Math.max(0, Math.min(1, amp));
-}
-function ampToHL1k(A) {
-  if (A <= 0) return -Infinity;
-  return 20 * Math.log10(A) + K_1K;
-}
+let listeningDeviceType;          // The type of audio listenting device the user is taking the test with (values: earphones, overear, onear)
 
-async function playSineBuffer(freqHz, dbfs, durationSec) {
-  const audioCtx = await getAudioContext();
+let calibrationConstant;          // Represents the dB SPL of a tone played at 0 dBFS; dB SPL = calibrationConstant + dBFS
 
-  const sr = audioCtx.sampleRate;
-  const n  = Math.max(1, Math.floor(durationSec * sr));
-  const buf = audioCtx.createBuffer(1, n, sr);
-  const ch0 = buf.getChannelData(0);
+let currentDbSpl;                 // The dB SPL of the tone currently being played
 
-  const amp = dbfsToAmp(dbfs);
-  const twoPiF = 2 * Math.PI * freqHz;
-
-  for (let i = 0; i < n; i++) ch0[i] = amp * Math.sin(twoPiF * (i / sr));
-
-  // 5 ms fade in/out
-  const k = Math.min(n, Math.floor(0.005 * sr));
-  for (let i = 0; i < k; i++) {
-    const g = i / k;
-    ch0[i] *= g;
-    ch0[n - 1 - i] *= g;
-  }
-
-  const src = audioCtx.createBufferSource();
-  src.buffer = buf;
-  src.connect(audioCtx.destination);
-  src.start();
-  await new Promise(res => (src.onended = res));
+// Computes the calibration constant given the dBFS value played by the software, and the actual dB SPL measured by the user
+function computeCalibrationConstant(dbfsPlayed, splMeasured)
+{
+  console.log(splMeasured - dbfsPlayed);
+  return splMeasured - dbfsPlayed;
 }
 
-// dB HL state
-let dbhlCurrentDbfs = -90;
-let dbhlRunning = false;
-
-async function playDbHlTone() {
-  const statusEl = document.getElementById("dbhl-status");
-  statusEl.textContent = `Playing 1 kHz @ ${dbhlCurrentDbfs.toFixed(2)} dBFS for ${DBHL_DURATION_SEC.toFixed(1)} s…`;
-  await playSineBuffer(1000, dbhlCurrentDbfs, DBHL_DURATION_SEC);
-  statusEl.textContent = `Last level: ${dbhlCurrentDbfs.toFixed(2)} dBFS`;
-
-  // Log each tone played
-  const log = document.getElementById("dbhl-log");
-  if (log) {
-    log.textContent += `Played 1 kHz @ ${dbhlCurrentDbfs.toFixed(2)} dBFS\n`;
-    log.scrollTop = log.scrollHeight;
-  }
+// Converts an amplitude value (linear gain) to dBFS
+function ampToDbfs(amplitude) 
+{
+  if (amplitude <= 0) return -Infinity;
+  return 20 * Math.log10(amplitude);
 }
 
-function startDbHlTest() {
+// Converts dBFS to an amplitude value (linear gain)
+function dbfsToAmp(dbfs)
+{
+  return Math.pow(10, dbfs / 20);
+}
+
+// Converts a dB SPL value to an amplitude (linear gain) using the calibration constant
+function splToAmp(spl)
+{
+  return Math.pow(10, (spl - calibrationConstant) / 20);
+}
+
+// Converts a dB SPL value to a dBFS value using the calibration constant
+function splToDbfs(spl)
+{
+  return spl - calibrationConstant;
+}
+
+// Converts a dBFS value to a dB SPL value using the calibration constant
+function dbfsToSpl(dbfs)
+{
+  return dbfs + calibrationConstant;
+}
+
+async function runDbHlCalibration()
+{
+    let ctx = await getAudioContext();
+
+    let calTonePlaying = false;
+    let calToneSrcNode;
+
+    const modalBackdrop = document.getElementById('dbhl-modal-backdrop');
+    modalBackdrop.style.display = 'flex';
+    document.body.dataset.prevOverflow = document.body.style.overflow || '';
+    document.body.style.overflow = 'hidden';
+
+    const calibrationOptionArea = document.getElementById('dbhl-modal-cal-sel');
+    const yesCalibrationButton = document.getElementById('dbhl-modal-yes-cal-btn');
+    const noCalibrationButton = document.getElementById('dbhl-modal-no-cal-btn');
+
+    const noCalibrationArea = document.getElementById('dbhl-modal-no-cal');
+    const listeningDeviceSelectionNoCal = document.getElementById('dbhl-modal-no-dev-sel');
+    const continueWithoutCalibrationButton = document.getElementById('dbhl-modal-continue-btn');
+
+    const calibrationArea = document.getElementById('dbhl-modal-calibration');
+    const listeningDeviceSelectionYesCal = document.getElementById('dbhl-modal-yes-dev-sel');
+    const calTonePlayStopButton = document.getElementById('dbhl-modal-play-stop-btn');
+    const dbReadingInput = document.getElementById('dbhl-modal-cal-input');
+    const doneButton = document.getElementById('dbhl-modal-cal-done');
+
+    yesCalibrationButton.addEventListener("click", async () => {
+      calibrationOptionArea.style.display = 'none';
+      calibrationArea.style.display = 'flex';
+    });
+
+    noCalibrationButton.addEventListener("click", async () => {
+      calibrationOptionArea.style.display = 'none';
+      noCalibrationArea.style.display = 'flex';
+    });
+
+    calTonePlayStopButton.addEventListener("click", async () => {
+      if (!calTonePlaying)
+      {
+        calToneSrcNode = getOscillatorNodeWithGain(ctx, DBHL_FREQ_HZ, CAL_TONE_GAIN);
+        calToneSrcNode.start();
+        calTonePlaying = true;
+        calTonePlayStopButton.textContent = "■ Stop";
+        calTonePlayStopButton.style.background = "#dc2626";
+      }
+      else
+      {
+        try { calToneSrcNode.stop(); } catch {}
+        calTonePlaying = false;
+        calTonePlayStopButton.textContent = "▶ Play";
+        calTonePlayStopButton.style.background = "#2563eb";
+      }
+    });
+
+    continueWithoutCalibrationButton.addEventListener("click", async () => {
+      calibrationConstant = DEFAULT_CAL_CONST;    // If the user did not go through calibration, use a default value
+      listeningDeviceType = listeningDeviceSelectionNoCal.value;
+      try { calToneSrcNode.stop(); } catch {};    // Stop the calibration tone if the user didn't already
+      // Hide the modal overlay
+      modalBackdrop.style.display = 'none';
+      document.body.style.overflow = document.body.dataset.prevOverflow || '';
+    });
+
+    doneButton.addEventListener("click", async () => {
+      if (!isNaN(dbReadingInput.value))
+        {
+          testToneDbfs = ampToDbfs(CAL_TONE_GAIN);
+          calibrationConstant = computeCalibrationConstant(testToneDbfs, parseFloat(dbReadingInput.value));
+          listeningDeviceType = listeningDeviceSelectionYesCal.value;
+          try { calToneSrcNode.stop(); } catch {};    // Stop the calibration tone if the user didn't already
+          // Hide the modal overlay
+          modalBackdrop.style.display = 'none';
+          document.body.style.overflow = document.body.dataset.prevOverflow || '';
+        }
+    });
+
+}
+
+let dbHlRunning = false;
+
+async function startDbHlTest()
+{
   // Only show the dB HL Testing area
   document.getElementById("mode-select").style.display = "none";
   document.getElementById("test-area").style.display = "none";
   document.getElementById("dbhl-test-area").style.display = "block";
+
+  runDbHlCalibration();
 
   // Reset UI
   document.getElementById("dbhl-result").textContent = "";
@@ -1116,61 +1186,97 @@ function startDbHlTest() {
   document.getElementById("dbhl-replay-row").style.display = "none";
   document.getElementById("dbhl-response-row").style.display = "none";
   document.getElementById("dbhl-start-row").style.display = "flex";
-
-  dbhlRunning = false;
+  document.getElementById("dbhl-results-area").style.display = "none";
+  dbHlRunning = false;
 
   // Begin the test on "Start Test" button click
   document.getElementById("dbhl-start-btn").onclick = async () => {
-    const startDb = parseFloat(document.getElementById("dbhl-start").value || "-90");
-    dbhlCurrentDbfs = Math.max(-120, Math.min(0, startDb));
+    currentDbSpl = DB_SPL_TEST_START;
 
     // Once the test has started, hide the "Start Test" button and show the test controls
     document.getElementById("dbhl-start-row").style.display = "none";
     document.getElementById("dbhl-response-row").style.display = "flex";
     document.getElementById("dbhl-replay-row").style.display = "block";
 
-    dbhlRunning = true;
+    dbHlRunning = true;
     await playDbHlTone(); // First tone
   };
 
   // "Replay" button replays the last tone
   document.getElementById("dbhl-replay-btn").onclick = async () => {
-    if (dbhlRunning) await playDbHlTone();
+    if (dbHlRunning) await playDbHlTone();
   };
 
   // "Yes" button ends test at current level
   document.getElementById("dbhl-yes").onclick = () => {
-    if (!dbhlRunning) return;
-    const A  = dbfsToAmp(dbhlCurrentDbfs);
-    const hl = ampToHL1k(A);
-    document.getElementById("dbhl-result").textContent =
-      `Lowest audible level at 1 kHz: ${hl.toFixed(1)} dB HL (K = ${K_1K.toFixed(1)} dB).`;
-    dbhlRunning = false;
+    if (!dbHlRunning) return;
+    endDbHlTest();
+    dbHlRunning = false;
   };
 
   // "No" button increases volume of the next tone, but ends test if stepping would cause level to exceed 0 dBFS
   document.getElementById("dbhl-no").onclick = async () => {
-    if (!dbhlRunning) return;
+    if (!dbHlRunning) return;
 
-    let step = parseFloat(document.getElementById("dbhl-step").value);
-    if (!Number.isFinite(step) || step <= 0) step = 2.0;
+    nextDbSpl = currentDbSpl + DB_SPL_TEST_STEP;
 
-    const proposed = dbhlCurrentDbfs + step;
-
-    if (proposed >= 0) {
-      // Clamp to 0 dBFS and end test (can't go louder without clipping)
-      dbhlCurrentDbfs = 0;
-      const A  = dbfsToAmp(dbhlCurrentDbfs);
-      const hl = ampToHL1k(A);
-      document.getElementById("dbhl-result").textContent =
-        `Lowest audible level at 1 kHz (at full scale): ${hl.toFixed(1)} dB HL (K = ${K_1K.toFixed(1)} dB).`;
-      dbhlRunning = false;
+    if (splToDbfs(nextDbSpl) >= 0)
+    {
+      currentDbSpl = dbfsToSpl(0);    // Clamp to 0 dBFS and end test (can't go louder without clipping)
+      endDbHlTest();
     } else {
       // Step and play next louder tone automatically
-      dbhlCurrentDbfs = proposed;
+      currentDbSpl = nextDbSpl;
       await playDbHlTone();
     }
   };
+}
+
+function endDbHlTest()
+{
+  document.getElementById("dbhl-result").textContent =
+        `Result: ${computeDbHlResult().toFixed(1)} decibels Hearing Loss`;
+
+  document.getElementById("dbhl-results-area").style.display = "flex";
+  dbHlRunning = false;
+}
+
+function computeDbHlResult()
+{
+  switch (listeningDeviceType) {
+    case "earphones":
+      return currentDbSpl - RETSPL_1KHZ_EARPHONES;
+    case "overear":
+      return currentDbSpl - RETSPL_1KHZ_OVEREAR;
+    case "onear":
+      return currentDbSpl - RETSPL_1KHZ_ONEAR;
+    default:
+      return currentDbSpl - RETSPL_1KHZ_ONEAR;
+  }
+}
+
+async function playDbHlTone()
+{
+  let ctx = await getAudioContext();
+
+  const testToneSrcNode = getOscillatorNodeWithGain(ctx, DBHL_FREQ_HZ, splToAmp(currentDbSpl));
+
+  const statusDisplay = document.getElementById("dbhl-status");
+  statusDisplay.textContent = `Playing 1 kHz @ ${currentDbSpl} dB SPL for ${DBHL_TONE_DURATION_SEC} s…`;
+
+  testToneSrcNode.start(ctx.currentTime);
+  testToneSrcNode.stop(ctx.currentTime + DBHL_TONE_DURATION_SEC);
+
+  testToneSrcNode.onended = () => {
+  statusDisplay.textContent = `Last level: ${currentDbSpl} dB SPL`;
+  };
+
+  // Log each tone played
+  const log = document.getElementById("dbhl-log");
+  if (log) {
+    log.textContent += `Played 1 kHz @ ${currentDbSpl} dB SPL\n`;
+    log.scrollTop = log.scrollHeight;
+  }
 }
 
 // ---------- Calibration Prompt Code ----------

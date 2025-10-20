@@ -45,11 +45,7 @@
       <p style="margin-bottom:12px; text-align: left;">This test will measure your dB HL by playing a 1 kHz tone for 1 second and seeing how you respond. If you can't hear the sound, then click "No", and it will become slightly louder. Once you're able to hear the tone, click "Yes" to end the test and receive your results.</p>
       <br>
       <div id="dbhl-controls" style="display:grid; grid-template-columns:max-content 110px 380px; grid-template-rows:auto auto; column-gap:48px; row-gap:8px; align-items:baseline; margin:8px 0;">
-        <label for="dbhl-start" style="justify-self:start;">Start level (dBFS):</label>
-        <input id="dbhl-start" type="number" value="-90" step="1" min="-120" max="-1" style="width:100px">
-        <span id="dbhl-status" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-style:italic; padding-left:24px; align-self:baseline;"></span>
-        <label for="dbhl-step" style="justify-self:start;">Step size (dB):</label>
-        <input id="dbhl-step" type="number" value="2.0" step="0.5" min="0.1" max="20" style="width:100px">
+        <span id="dbhl-status" style="display:inline-block; width:22ch; white-space:normal; word-wrap:break-word; overflow-wrap:break-word; font-style:italic; padding-left:24px;"></span>
         <div id="dbhl-replay-row" style="display:none; padding-left:24px;">
           <button id="dbhl-replay-btn" type="button" style="padding:8px 12px; border:none; border-radius:8px; font-weight:600; cursor:pointer;">Replay</button>
         </div>
@@ -62,11 +58,117 @@
         <button id="dbhl-yes" style="background:#16a34a; color:#fff; padding:8px 12px; border:none; border-radius:8px; font-weight:600; cursor:pointer;">Yes, I heard it</button>
         <button id="dbhl-no" style="background:#dc2626; color:#fff; padding:8px 12px; border:none; border-radius:8px; font-weight:600; cursor:pointer;">No, I didn't hear it</button>
       </div>
-      <p id="dbhl-result" style="font-weight:600; margin-top:10px;"></p>
+      <div id="dbhl-results-area" style="display:none; flex-direction:column; align-items:center; justify-content:center; gap:12px; margin:12px 0; text-align:center;">
+        <p id="dbhl-result" style="font-weight:600; margin-top:10px;"></p>
+        <img id="dbhl-diagram" src="charts/dbhl_norms.png" style="width:80%; max-width:600px; border-radius:8px; margin-top:12px;">
+      </div>
       <pre id="dbhl-log" style="background:#f8f9fa; padding:10px; border-radius:8px; max-height:200px; overflow:auto; margin-top:8px;"></pre>
     </div>
 
     <!--- End dB HL Test Area ---->
+
+    <!--- dB HL Calibration Dialog --->
+    <div id="dbhl-modal-backdrop" style="
+     position:fixed; inset:0; background:rgba(0,0,0,.5);
+     display:none;
+     align-items:flex-start;
+     justify-content:center;
+     z-index:9999;
+     overflow:auto;
+     padding-top:60px;
+   ">
+     <div id="dbhl-modal" role="dialog" aria-modal="true" aria-labelledby="dbhl-modal-title" style="
+       background:#fff; border-radius:12px; padding:16px; width:min(700px, 92vw);
+       box-shadow:0 10px 30px rgba(0,0,0,.25); max-height:85vh;
+       display:flex; flex-direction:column;
+     ">
+       <div style="display:flex; justify-content:space-between; gap:12px;">
+         <h3 id="dbhl-modal-title" style="margin:0; font-size:18px;">Test Calibration: Important!</h3>
+       </div>
+   
+       <div id="dbhl-modal-body" style="margin-top:16px; overflow:auto;">
+       
+         <div id="dbhl-modal-cal-sel" style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+           <p style="text-align:center;">In order to receive the most accurate results, you need to calibrate your test. <b>This will require you to download and use an app on your iPhone or Android smartphone device.</b></p>
+           <p style="text-align:center;">Please select an option:</p>
+           <button id="dbhl-modal-yes-cal-btn" style="background:#16a34a; color:white; padding:8px 14px; border:none; border-radius:8px; font-weight:600; cursor:pointer;">Yes, I want to calibrate my test.</button>
+           <button id="dbhl-modal-no-cal-btn" style="background:#dc2626; color:white; padding:8px 14px; border:none; border-radius:8px; font-weight:600; cursor:pointer;">I want to take the uncalibrated test.</button>
+         </div>
+   
+         <div id="dbhl-modal-no-cal" style="display:none; flex-direction:column; align-items:center; gap:10px;">
+           <p>Please set your system volume to <b>75%</b>, then select which type of listening equipment you'll be using to take the test. Press <b>Continue</b> to proceed.</p>
+           <label for="dbhl-modal-no-dev-sel" style="font-weight:600;">Listening device:</label>
+           <select id="dbhl-modal-no-dev-sel">
+             <option value="earphones">Earphones</option>
+             <option value="overear">Over-ear headphones</option>
+             <option value="onear">On-ear headphones</option>
+           </select>
+           <button id="dbhl-modal-continue-btn" type="button" style="
+           background:#16a34a; color:white;
+           padding:10px 20px; border:none; border-radius:8px;
+           font-weight:600; cursor:pointer;">Continue</button>
+         </div>
+   
+         <div id="dbhl-modal-calibration" style="display:none; flex-direction:column; align-items:center; text-align:left; gap:16px; padding:8px 0; max-width:600px; margin:0 auto;">
+   
+           <p>
+             <b>1.</b> Set your system volume to <b>75%</b>. Make sure you have your <b>smartphone</b> and a pair of <b>headphones or earphones</b> with you, but don't put them on yet.
+             Select which type of listening equipment you'll be using below:
+           </p>
+   
+           <label for="dbhl-modal-yes-dev-sel" style="font-weight:600;">Listening device:</label>
+           <select id="dbhl-modal-yes-dev-sel">
+             <option value="earphones">Earphones</option>
+             <option value="overear">Over-ear headphones</option>
+             <option value="onear">On-ear headphones</option>
+           </select>
+   
+           <p>
+             <b>2.</b> Download the
+             <img src="images/decibel_x_icon.png" style="width:48px; height:48px; vertical-align:middle; margin:0 4px;">
+             <b>Decibel X</b> app by SkyPaw on your iPhone or Android device.
+           </p>
+   
+           <p><b>3.</b> Open the app.</p>
+   
+           <p>
+             <b>4.</b> Press the edge of the phone containing the bottom microphone (usually the side where the charging port is) into the earpiece of your headphones. Try to cup your hands around your phone in order to create a tight seal against the cushion of the earpiece. Make sure you can still read the screen!
+           </p>
+   
+           <img src="images/phone_earpiece_position_demo.png" alt="Diagram showing phone mic pressed against headphone earpiece" style="width:60%; max-width:400px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.15);">
+   
+           <p><b>5.</b> When you are ready, click the <b>Play</b> button below.</p>
+   
+           <button id="dbhl-modal-play-stop-btn" type="button" style="
+           background:#2563eb; color:white;
+           padding:10px 20px; border:none; border-radius:8px;
+           font-weight:600; cursor:pointer;">
+           ▶ Play
+           </button>
+   
+           <p>
+             <b>6.</b> While the test tone is playing, and with your phone's microphone pressed against the earpiece, observe the decibel reading on the screen (it may fluctuate slightly). 
+             Enter the reading below:
+           </p>
+   
+           <img src="images/decibel_reading_in_app.png" style="width:60%; max-width:400px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.15);">
+   
+           <label for="dbhl-modal-cal-input" style="font-weight:600;">Decibel reading:</label>
+           <input id="dbhl-modal-cal-input" type="number" step="0.1" placeholder="" style="width:120px; padding:6px 8px; border:1px solid #ccc; border-radius:6px; font-size:15px; text-align:center;">
+   
+           <p><b>7.</b> You’re finished! Click the button below to proceed with your calibrated test.</p>
+   
+           <button id="dbhl-modal-cal-done" type="button" style="
+           background:#16a34a; color:white;
+           padding:10px 20px; border:none; border-radius:8px;
+           font-weight:600; cursor:pointer;">Done</button>
+         </div>
+   
+       </div>
+     </div>
+   </div>
+
+
 
 
     <!---- Digits-in-Noise Test Area ----> 
