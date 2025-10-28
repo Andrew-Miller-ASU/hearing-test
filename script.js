@@ -15,6 +15,48 @@ async function getAudioContext()
   return audioContext;
 }
 
+function createEarRouter(ctx)
+{
+  const input = ctx.createGain();    
+  const leftGain = ctx.createGain();
+  const rightGain = ctx.createGain();
+  const channelMerger = ctx.createChannelMerger(2);
+
+  [input, leftGain, rightGain, channelMerger].forEach(n => {
+    n.channelCountMode = "explicit";
+    n.channelInterpretation = "discrete";
+  });
+
+  input.connect(leftGain);
+  input.connect(rightGain);
+  leftGain.connect(channelMerger, 0, 0);
+  rightGain.connect(channelMerger, 0, 1);
+
+  function applyMode()
+  {
+    const mode = (window.testEarMode || 'both');
+    if (mode === 'left')      { leftGain.gain.value = 1;   rightGain.gain.value = 0; }
+    else if (mode === 'right'){ leftGain.gain.value = 0;   rightGain.gain.value = 1; }
+    else                      { leftGain.gain.value = 1;   rightGain.gain.value = 1; }
+  }
+
+  return { input, output: channelMerger, applyMode };
+}
+
+async function ensureEarRouter()
+{
+  const ctx = await getAudioContext();
+
+  if (!window.earRouter)
+  {
+    window.earRouter = createEarRouter(ctx);
+    window.earRouter.output.connect(ctx.destination);
+  }
+
+  window.earRouter.applyMode();
+  return window.earRouter;
+}
+
 // Given a URL (file path), creates an AudioBuffer object which stores the audio asset in memory
 // The audio can be played by passing the AudioBuffer object into a AudioBufferSourceNode object
 // The AudioBuffer is persistent and can be used to generate multiple AudioBufferSourceNodes, which can only be played once
@@ -32,7 +74,12 @@ function getSourceNode(ctx, audioBuffer)
 {
   const srcNode = ctx.createBufferSource();
   srcNode.buffer = audioBuffer;
-  srcNode.connect(ctx.destination);
+
+  ensureEarRouter().then(router => {
+    router.applyMode();
+    srcNode.connect(router.input);
+  });
+
   return srcNode;
 } 
 
@@ -50,7 +97,11 @@ function getSourceNodeWithGain(ctx, audioBuffer, gainAmount)
   const gainNode = ctx.createGain();
   gainNode.gain.value = gainAmount;
 
-  srcNode.connect(gainNode).connect(ctx.destination);
+  ensureEarRouter().then(router => {
+    router.applyMode();
+    srcNode.connect(gainNode).connect(router.input);
+  });
+
   return srcNode;
 } 
 
@@ -64,7 +115,11 @@ function getOscillatorNode(ctx, frequency)
   oscNode.type = "sine";                    // Specifies the shape of the waveform; options include "sine", "square", "sawtooth", "triangle" and "custom"
   oscNode.frequency.value = frequency;      // Sets the frequency (in Hz) using the specified value
 
-  oscNode.connect(ctx.destination);
+  ensureEarRouter().then(router => {
+    router.applyMode();
+    oscNode.connect(router.input);
+  });
+
   return oscNode;
 }
 
@@ -82,10 +137,24 @@ function getOscillatorNodeWithGain(ctx, frequency, gainAmount)
   const gainNode = ctx.createGain();
   gainNode.gain.value = gainAmount;
 
-  oscNode.connect(gainNode).connect(ctx.destination);
+  ensureEarRouter().then(router => {
+    router.applyMode();
+    oscNode.connect(gainNode).connect(router.input);
+  });
+
   return oscNode;
 }
 
+
+window.testEarMode = 'both';
+
+function selectTestEarMode(value)
+{
+  document.querySelectorAll(".toggle-segment").forEach(s => s.classList.remove("active"));
+  document.querySelector(`.toggle-segment[data-value="${value}"]`).classList.add("active");
+  window.testEarMode = value;
+  if (window.earRouter) earRouter.applyMode();
+}
 
 // ---------- Frequency Test Code ----------
 
@@ -133,6 +202,7 @@ let pinpointing_min = 2000;
   window.startFreqTest = function startFreqTest() {
     // Hide other test areas to avoid overlap
     safeHide("mode-select");
+    safeHide("ear-select");
     safeHide("test-area");
     safeHide("dbhl-test-area");
     safeHide("din-test-area");
@@ -396,9 +466,9 @@ let pinpointing_min = 2000;
   };
   
   window.freqPlayPlaceholder = function freqPlayPlaceholder() {
-    if (!freqPlaying) {                                                // Only start the tone if it's not already playing
-      oscNode = getOscillatorNodeWithGain(ctx, freqCurrentHz, 0.25);   // Create the OscillatorNode to play the tone (at the freqency determined by the input slider)
-      oscNode.start();                                                 // Play the tone
+    if (!freqPlaying) {                                                             // Only start the tone if it's not already playing
+      oscNode = getOscillatorNodeWithGain(ctx, freqCurrentHz, 0.25);                // Create the OscillatorNode to play the tone (at the freqency determined by the input slider)
+      oscNode.start();                                                              // Play the tone
       freqPlaying = true;
       setFreqStatus(`Playing ${freqFmtHz(freqCurrentHz)}`);
       setFreqStatus2(`Playing ${freqFmtHz(freqCurrentHz)}`);
@@ -455,6 +525,7 @@ let pinpointing_min = 2000;
     safeHide("freq-results-area");
     safeHide("pinpoint_highest_audible_for_freq_test");
     safeShow("mode-select");
+    safeShow("ear-select");
   };
 
   // Automatically stop the tone playback if the user leaves the test
@@ -539,6 +610,7 @@ function storeRoundData(digitsPlayed, digitsHeard)
 async function DinCalibrationPage(){ //Calibration page for DIN Test
 
   document.getElementById("mode-select").style.display = "none";
+  document.getElementById("ear-select").style.display = "none";
   document.getElementById("din-calibration-page").style.display = "block";
 
   
@@ -575,6 +647,7 @@ function resetDinTest()
 async function startDinTest()
 {
   document.getElementById("mode-select").style.display = "none";      // Hide the mode selection menu
+  document.getElementById("ear-select").style.display = "none";
   document.getElementById("din-test-area").style.display = "block";   // Show the DIN testing interface
 
   resetDinTest();
@@ -715,6 +788,7 @@ function tgHide(id){ const el=tg$(id); if (el) el.style.display='none'; }
 // Open TG; hide other modes
 window.startTemporalGapTest = function startTemporalGapTest(){
   tgHide("mode-select");
+  tgHide("ear-select");
   tgHide("test-area");
   tgHide("dbhl-test-area");
   tgHide("din-test-area");
@@ -731,6 +805,7 @@ window.startTemporalGapTest = function startTemporalGapTest(){
 window.backToModesFromTG = function backToModesFromTG(){
   tgHide("tg-test-area");
   tgShow("mode-select");
+  tgShow("ear-select");
 };
 
 // ---------- Audio engine (centered silent gap inside noise) ----------
@@ -779,6 +854,8 @@ async function tgGetNoiseBuffer(durationSec){
   return buf;
 }
 
+let tgdTestBaseGain = 0.1;
+
 // Play one interval with an optional internal silent gap
 async function tgdPlayNoiseInterval(gapMs, gapPosPct, fade, startAt){
   const ctx = await _getCtx();
@@ -788,31 +865,33 @@ async function tgdPlayNoiseInterval(gapMs, gapPosPct, fade, startAt){
   const src  = ctx.createBufferSource();
   src.buffer = buf;
   const gain = ctx.createGain();
-  gain.gain.value = 1.0;
-  src.connect(gain).connect(ctx.destination);
+  gain.gain.value = tgdTestBaseGain;
+  const router = await ensureEarRouter();
+  router.applyMode();
+  src.connect(gain).connect(router.input);
 
   const t0 = startAt ?? (ctx.currentTime + 0.05);
   const t1 = t0 + TGD_NOISE_SEC;
 
   const ramp = TGD_FADE_MS / 1000;
   gain.gain.setValueAtTime(0, t0);
-  gain.gain.linearRampToValueAtTime(1, t0 + ramp);
+  gain.gain.linearRampToValueAtTime(tgdTestBaseGain, t0 + ramp);
 
   if (gapMs > 0){
     const gapStart = t0 + (TGD_NOISE_SEC * (gapPosPct / 100));
     const gapEnd   = gapStart + (gapMs / 1000);
     if (fade){
-      gain.gain.setValueAtTime(1, Math.max(t0 + ramp, gapStart - ramp));
+      gain.gain.setValueAtTime(tgdTestBaseGain, Math.max(t0 + ramp, gapStart - ramp));
       gain.gain.linearRampToValueAtTime(0, gapStart);
       gain.gain.setValueAtTime(0, gapEnd);
-      gain.gain.linearRampToValueAtTime(1, gapEnd + ramp);
+      gain.gain.linearRampToValueAtTime(tgdTestBaseGain, gapEnd + ramp);
     } else {
-      gain.gain.setValueAtTime(1, t0 + ramp);
+      gain.gain.setValueAtTime(tgdTestBaseGain, t0 + ramp);
       gain.gain.setValueAtTime(0, gapStart);
-      gain.gain.setValueAtTime(1, gapEnd);
+      gain.gain.setValueAtTime(tgdTestBaseGain, gapEnd);
     }
   } else {
-    gain.gain.setValueAtTime(1, t1 - ramp);
+    gain.gain.setValueAtTime(tgdTestBaseGain, t1 - ramp);
   }
   gain.gain.linearRampToValueAtTime(0, t1);
 
@@ -1230,6 +1309,7 @@ async function startDbHlTest()
 {
   // Only show the dB HL Testing area
   document.getElementById("mode-select").style.display = "none";
+  document.getElementById("ear-select").style.display = "none";
   document.getElementById("test-area").style.display = "none";
   document.getElementById("dbhl-test-area").style.display = "block";
 
@@ -1350,6 +1430,7 @@ function proceedToTest() {
     //User is finished with Calibration, display the test modes.
     document.getElementById("calibration-page").style.display = "none";
     document.getElementById("mode-select").style.display = "block";
+    document.getElementById("ear-select").style.display = "block";
 
 }
 
@@ -1367,6 +1448,7 @@ function startTest(mode) {
   document.getElementById("summary-text").textContent = "";
 
   document.getElementById("mode-select").style.display = "none";
+  document.getElementById("ear-select").style.display = "none";
   document.getElementById("test-area").style.display = "block";
   
   // Define tones

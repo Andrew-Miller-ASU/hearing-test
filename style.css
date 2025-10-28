@@ -1,3 +1,40 @@
+#three-toggle {
+  margin: 0 auto;
+}
+
+.toggle-container {
+  display: flex;
+  border: 2px solid #004aad;
+  border-radius: 30px;
+  overflow: hidden;
+  width: 360px;
+  background: white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+}
+
+.toggle-segment {
+  flex: 1;
+  text-align: center;
+  padding: 12px 0;
+  cursor: pointer;
+  border-right: 2px solid #004aad;
+  font-family: Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: #004aad;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.toggle-segment:last-child {
+  border-right: none;
+}
+
+.toggle-segment.active {
+  background-color: #0074e8;
+  color: white;
+  font-weight: 600;
+}
+
 body {
   font-family: 'Segoe UI', sans-serif;
   background: #f4f7fb;

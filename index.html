@@ -16,11 +16,21 @@
         <audio id="calibrationTestAudio" style="display: none;" controls></audio><br>
     </div>
     <div id="din-calibration-page" style="display: none;">
-        <p id="din_calibration_page_text" style="margin-bottom:12px; text-align: left;">Welcome to the Digit-In-Noise Calibration Page! Make sure that you're comfortable witht the audio. Click "Test Volume" and listen for the sound. You should adjust your audio devices as necessary before proceeding. When you are ready to move on to the test, click the "Proceed to Test" button.</p>
+        <p id="din_calibration_page_text" style="margin-bottom:12px; text-align: left;">Welcome to the Digit-In-Noise Calibration Page! Make sure that you're comfortable with the audio. Click "Test Volume" and listen for the sound. You should adjust your audio devices as necessary before proceeding. When you are ready to move on to the test, click the "Proceed to Test" button.</p>
         <button id="din_calibration_test_volume_btn">Test Volume</button>
         <button id="din_calibration_proceed_to_test_btn">Proceed To Test</button>
         <audio id="dinCalibrationTestAudio" style="display: none;" controls></audio><br>
     </div>
+
+    <div id="ear-select" style="display:none; text-align:center; margin-top:20px;">
+      <h3 style="margin-bottom:10px;">Which ear(s) would you like to test?</h3>
+      <div id="three-toggle" class="toggle-container">
+        <div class="toggle-segment" data-value="left"  onclick="selectTestEarMode('left')">Left</div>
+        <div class="toggle-segment" data-value="right" onclick="selectTestEarMode('right')">Right</div>
+        <div class="toggle-segment" data-value="both"  onclick="selectTestEarMode('both')">Both</div>
+      </div>
+    </div>
+
     <div id="mode-select" style="display: none;">
        <h2>Choose Your Test Mode</h2>
        <button onclick="startTest('both')">🔊 No Headphones</button>
