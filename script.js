@@ -1371,8 +1371,40 @@ async function startDbHlTest()
 
 function endDbHlTest()
 {
+
+  let dbHlResult = computeDbHlResult().toFixed(1);
+
   document.getElementById("dbhl-result").textContent =
-        `Result: ${computeDbHlResult().toFixed(1)} decibels Hearing Loss`;
+        `Result: ${dbHlResult} decibels Hearing Loss`;
+
+  let expectedAge;
+
+  if (dbHlResult <= 15) {
+    expectedAge = "0–19";
+  }
+  else if (dbHlResult <= 20) {
+    expectedAge = "20–29";
+  }
+  else if (dbHlResult <= 25) {
+    expectedAge = "30–39";
+  }
+  else if (dbHlResult <= 30) {
+    expectedAge = "40–49";
+  }
+  else if (dbHlResult <= 35) {
+    expectedAge = "50–59";
+  }
+  else if (dbHlResult <= 40) {
+    expectedAge = "60–69";
+  }
+  else if (dbHlResult <= 50) {
+    expectedAge = "70–79";
+  }
+  else {
+    expectedAge = "80+";
+  }
+
+  document.getElementById("dbhl-expected-age").textContent = `Expected age: ${expectedAge} years old`;
 
   document.getElementById("dbhl-results-area").style.display = "flex";
   dbHlRunning = false;
