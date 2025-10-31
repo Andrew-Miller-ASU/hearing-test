@@ -506,6 +506,14 @@ let pinpointing_min = 2000;
         `Highest audible frequency on this setup: <strong>${freqFmtHz(freqHighestHz)}</strong>.`;
     }
 
+    freqHighestHzSimplifiedExplanation = document.getElementById("freq-results-norms-simplified-explanation");
+    if(freqHighestHz <= 8000){
+      freqHighestHzSimplifiedExplanation.innerHTML = `<strong>In your case, your score was ${freqFmtHz(freqHighestHz)}, which is a sign of frailty. We recommend consulting with a specialist.</strong>`;
+    }
+    else{
+      freqHighestHzSimplifiedExplanation.innerHTML = `<strong>In your case, your score was ${freqFmtHz(freqHighestHz)}, which is above the range where hearing loss is typically detected. This test hasn't detected signs of frailty for you.</strong>`;
+    }
+
     // Replace the testing UI with the results area
     safeHide("freq-test-area");
     safeHide("pinpoint_highest_audible_for_freq_test");
@@ -741,16 +749,37 @@ function endDinTest()
   // Find the user's best SNR score (the lowest SNR in a round that the user got correct)
 
   let lowestSnr = Infinity;
+  DIN_BEST_SNR_DISPLAY = document.getElementById("din-best-snr-display");
 
   for (const item of dinTestData)
   {
     if (item.result === true && item.snr < lowestSnr) lowestSnr = item.snr;
   }
 
+  DIN_Test_Normal_Result_Explanation = "Your score falls into the 'Normal' category. This test hasn't detected any causes for concern.";
+  DIN_Test_Inefficient_Result_Explanation = "Your score falls into the 'Inefficient' category. While this likely isn't a major sign for concern, this does indicate that you are not in optimal condition and may be at risk of frailty sooner than you think. It might be a good idea to consult with a specialist and get a proper check up.";
+  DIN_Test_Poor_Result_Explanation = "Your score falls into the 'Poor' category. This is a sign of frailty. We recommend seeing a specialist.";
+
   document.getElementById("din-test-controls").style.display = "none";                                                      // Hide the controls for an active test
-  document.getElementById("din-best-snr-display").textContent =                                                             // Display the user's best (lowest) SNR score
-    `Your best SNR score was: ${lowestSnr === Infinity ? 'N/A (Too high to be measured)' : `${lowestSnr.toFixed(2)} dB`}`;
+  DIN_BEST_SNR_DISPLAY.textContent =                                                             // Display the user's best (lowest) SNR score
+    `Your best SNR score was: ${lowestSnr === Infinity ? `N/A. None of your attempts were correct. While this could be a sign of frailty, in which we would recommend you consult with a specialist, it is likely that you didn't complete the full test. We recommend redoing the test to completion for a more accurate assessment.` : `${lowestSnr.toFixed(2)} dB`}`;
   document.getElementById("din-results-section").style.display = "block";                                                   // Show the end-of-test results table
+
+  if(lowestSnr != Infinity){ // explanations for the results.
+
+    DIN_Test_Display_Explanation = DIN_BEST_SNR_DISPLAY.textContent;
+
+    if(lowestSnr.toFixed(2) <= -5.55){
+      DIN_BEST_SNR_DISPLAY.textContent = DIN_Test_Display_Explanation + " " + DIN_Test_Normal_Result_Explanation;
+    }
+    else if(lowestSnr.toFixed(2) > -5.55 && lowestSnr.toFixed(2) <= -3.8){
+
+      DIN_BEST_SNR_DISPLAY.textContent = DIN_Test_Display_Explanation + " " + DIN_Test_Inefficient_Result_Explanation;
+    }
+    else{
+      DIN_BEST_SNR_DISPLAY.textContent = DIN_Test_Display_Explanation + " " + DIN_Test_Poor_Result_Explanation;
+    }
+  }
 }
 
 // Given a digit triplet and gain amount, will play the audio for the digit triplet concurrently with the noise audio (with the specified gain adjustment)
@@ -1139,8 +1168,15 @@ window.tgChoose = function tgChoose(choice){
     }
 
     tg$("tg-status").textContent = "Done";
-    tg$("tg-result-summary").textContent =
-      `Estimated temporal resolution ≈ ${estimate.toFixed(1)} ms (lower is better).`;
+    if(estimate.toFixed(1) < 8){
+      tg$("tg-result-summary").innerHTML =
+        `<strong>Estimated temporal resolution ≈ ${estimate.toFixed(1)} ms (lower is better). This is relatively normal.</strong>`;
+    }
+    else{
+
+      tg$("tg-result-summary").textContent =
+        `<strong>Estimated temporal resolution ≈ ${estimate.toFixed(1)} ms (lower is better). It might be a good idea to consult with a specialist.</strong>`;
+    }
     tgShow("tg-results");
     return;
   }
@@ -1373,38 +1409,45 @@ function endDbHlTest()
 {
 
   let dbHlResult = computeDbHlResult().toFixed(1);
-
-  document.getElementById("dbhl-result").textContent =
-        `Result: ${dbHlResult} decibels Hearing Loss`;
-
   let expectedAge;
+  let dbhlSimpleResultsExplanation;
 
   if (dbHlResult <= 15) {
     expectedAge = "0–19";
+    dbhlSimpleResultsExplanation = "Based on your results, you likely fall into the 'Normal Hearing Ability' category. This means that this test hasn't detected any warning signs of hearing loss.";
   }
   else if (dbHlResult <= 20) {
     expectedAge = "20–29";
+    dbhlSimpleResultsExplanation = "Based on your results, you likely fall into the 'Normal Hearing Ability' category. This means that this test hasn't detected any warning signs of hearing loss.";
   }
   else if (dbHlResult <= 25) {
     expectedAge = "30–39";
+    dbhlSimpleResultsExplanation = "Based on your results, you likely fall into the 'Normal Hearing Ability' category. This means that this test hasn't detected any warning signs of hearing loss.";
   }
   else if (dbHlResult <= 30) {
     expectedAge = "40–49";
+    dbhlSimpleResultsExplanation = "Based on your results, you likely fall into the 'Mild Hearing Loss' category. This means that this test has detected some warning signs of hearing loss. We recommend consulting with a specialist.";
   }
   else if (dbHlResult <= 35) {
     expectedAge = "50–59";
+    dbhlSimpleResultsExplanation = "Based on your results, you likely fall into the 'Mild Hearing Loss' category. This means that this test has detected some warning signs of hearing loss. We recommend consulting with a specialist.";
   }
   else if (dbHlResult <= 40) {
     expectedAge = "60–69";
+    dbhlSimpleResultsExplanation = "Based on your results, you likely fall into the 'Mild Hearing Loss' category. This means that this test has detected some warning signs of hearing loss. We recommend consulting with a specialist.";
   }
   else if (dbHlResult <= 50) {
     expectedAge = "70–79";
+    dbhlSimpleResultsExplanation = "Based on your results, you likely fall into the 'Moderate Hearing Loss' category. This means that this test has detected some warning signs of hearing loss. We recommend consulting with a specialist.";
   }
   else {
     expectedAge = "80+";
+    dbhlSimpleResultsExplanation = "Based on your results, you likely fall into the 'Moderately Severe Hearing Loss' category or worse. This means that this test has detected warning signs of hearing loss. We recommend consulting with a specialist.";
   }
 
-  document.getElementById("dbhl-expected-age").textContent = `Expected age: ${expectedAge} years old`;
+  document.getElementById("dbhl-result").textContent =
+        `Result: ${dbHlResult} decibels Hearing Loss. ${dbhlSimpleResultsExplanation}`;
+  document.getElementById("dbhl-expected-age").textContent = `It is expected to see your results for a person around the ages of ${expectedAge} years old.`;
 
   document.getElementById("dbhl-results-area").style.display = "flex";
   dbHlRunning = false;
@@ -1448,6 +1491,7 @@ async function playDbHlTone()
   }
 }
 
+// ---------- End of dB HL Testing Code ---------- //
 // ---------- Calibration Prompt Code ----------
 
 function calibrationTest() {
