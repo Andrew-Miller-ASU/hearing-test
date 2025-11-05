@@ -1,0 +1,21 @@
+# Hearing Test — Dependencies (for content prep & local dev)
+
+This project is a static web app (HTML/CSS/JS) 
+The only runtime library is **Chart.js**, loaded from a CDN in `index.html`.
+
+## Python (offline audio prep only)
+If you need to (re)generate audio assets (e.g., the 000–999 triplets for the Digits‑in‑Noise test),
+install the following in a virtual environment:
+
+pydub>=0.25.1
+
+### System requirement
+- FFmpeg (required by pydub). Install via your OS package manager:
+  - macOS: `brew install ffmpeg`
+  - Ubuntu/Debian: `sudo apt-get install ffmpeg`
+  - Windows: install FFmpeg and add it to PATH.
+
+## Optional (not required to run the site)
+- A simple static server for local testing (choose one):
+  - Python: `python3 -m http.server 8000`
+  - Node (if you prefer): `npx http-server . -p 8000`
