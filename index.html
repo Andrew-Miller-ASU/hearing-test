@@ -9,10 +9,10 @@
 <body>
   <div id="container">
     <h1>Online Hearing Test</h1>
-    <div id="calibration-page">
+    <div id="calibration-page" style="display: none;">
         <p id="calibration_page_text" style="margin-bottom:12px; text-align: left;">Welcome to the Online Hearing Test! First, let's ensure your audio devices are properly calibrated to your preferences. Click the "Test Volume" button below for the controls to play a sound. If you can hear the sound and it is an appropriate volume for you, click "Proceed To Test". Otherwise, please adjust your volume accordingly.</p>
-        <button onclick="calibrationTest()">Test Volume</button>
-        <button onclick="proceedToTest()">Proceed To Test</button>
+        <button id="cal-test-volume-btn">Test Volume</button>
+        <button id="cal-proceed-btn">Proceed To Test</button>
         <audio id="calibrationTestAudio" style="display: none;" controls></audio><br>
     </div>
     <div id="din-calibration-page" style="display: none;">
@@ -22,7 +22,7 @@
         <audio id="dinCalibrationTestAudio" style="display: none;" controls></audio><br>
     </div>
 
-    <div id="ear-select" style="display:none; text-align:center; margin-top:20px;">
+    <div id="ear-select" style="text-align:center; margin-top:20px;">
       <h3 style="margin-bottom:10px;">Which ear(s) would you like to test?</h3>
       <div id="three-toggle" class="toggle-container">
         <div class="toggle-segment" data-value="left"  onclick="selectTestEarMode('left')">Left</div>
@@ -31,7 +31,7 @@
       </div>
     </div>
 
-    <div id="mode-select" style="display: none;">
+    <div id="mode-select">
        <h2>Choose Your Test Mode</h2>
        <button onclick="startTest('both')">🔊 No Headphones</button>
        <button onclick="startTest('headphones')">🎧 Headphones (Left & Right)</button>
@@ -185,6 +185,8 @@
        </div>
      </div>
    </div>
+
+   <!--- End dB HL Calibration Dialog --->
 
 
 
@@ -470,6 +472,12 @@
     </details>
   </div>
 
-  <script src="script.js"></script>
+  <script src="audio_utilities.js"></script>
+  <script src="ui.js"></script>
+  <script src="dbhl_test.js"></script>
+  <script src="din_test.js"></script>
+  <script src="freq_test.js"></script>
+  <script src="original_tests.js"></script>
+  <script src="tgd_test.js"></script>
 </body>
 </html>
