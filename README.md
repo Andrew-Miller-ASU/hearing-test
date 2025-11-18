@@ -2,7 +2,7 @@
 
 This software provides a collection of tests that users can take to assess different aspects of their hearing. These tests should not be considered a substitute for professional medical advice.
 
-## Tests Modes
+## Test Modes
 
 - Measure your hearing in the left ear only, right ear only, or in both ears by using the selector on the home page
 
@@ -31,7 +31,7 @@ This software provides a collection of tests that users can take to assess diffe
 
 1. Download the repository and navigate to the local `hearing-test` directory.
 2. Start a simple HTTP server in that directory using `python -m http.server <port>`.
-3. Go to `http://localhost:<port>>/` in your browser to begin using the software.
+3. Go to `http://localhost:<port>/` in your browser to begin using the software.
 
 ## Requirements
 
