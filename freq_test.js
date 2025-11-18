@@ -1,5 +1,3 @@
-const INIT_FREQ = 1000;         // Specifies the initial position of the input slider
-
 /***********************
  * Highest-Only Frequency Test
  * - Adds a mode from the existing mode-select
@@ -12,7 +10,7 @@ let pinpointing_min = 2000;
 (async function () {
   // --- Local state
   let ctx = await getAudioContext();
-  let freqCurrentHz = INIT_FREQ;
+  let freqCurrentHz = 2000;
   let freqHighestHz = null;
   let freqPlaying = false;
 

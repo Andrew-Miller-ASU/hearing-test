@@ -3,22 +3,27 @@
 ```text
 project/
 ├─ index.html
-├─ script.js
+├─ audio_utilities.js
+├─ dbhl_test.js
+├─ din_test.js
+├─ freq_test.js
+├─ original_tests.js
+├─ tgd_test.js
+├─ ui.js
 ├─ style.css
 ├─ README.md
 ├─ generate_tone.ipynb
 ├─ generating_audio.py
-├─ HEARING_USER_MANUAL.md            <-- this file
-├─ HEARING_REQUIREMENTS.txt
-├─ HEARING_RESEARCH_NOTES.md
-├─ AUDIO_PREP_GUIDE.md               <-- how to build DIN triplets
 ├─ audio/
-│  ├─ 250Hz_20dB.wav, ... (tone files used by index.html)
+│  ├─ 250Hz_20dB.wav, ... 
 │  └─ din_test/
 │     ├─ digits_normalized/
+│     ├─ digits_original/
 │     │  ├─ 0.wav ... 9.wav
 │     ├─ triplets_normalized/        <-- generated 000.wav..999.wav
+│     ├─ triplets_original/
 │     └─ din_noise.wav
 └─ charts/
 └─ images/
+└─ docs/
 ```
